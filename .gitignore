@@ -1,0 +1,11 @@
+.env
+node_modules/
+package.json
+package-lock.json
+server.js
+cloudflare-worker.js
+start.bat
+start-silent.vbs
+setup-startup.bat
+設定開機自動啟動.bat
+.claude/
