@@ -929,6 +929,104 @@
       flex-direction: column;
       gap: 10px
     }
+
+    /* ── 漢堡按鈕（手機才顯示）──────────────────────────── */
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      color: var(--text);
+      border-radius: 8px;
+      transition: background .15s
+    }
+    .menu-toggle:hover { background: var(--surface2) }
+    .menu-toggle svg { width: 20px; height: 20px; display: block }
+
+    /* 側邊欄遮罩（手機點選後出現） */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 299
+    }
+    .sidebar-overlay.open { display: block }
+
+    /* ── 手機版 RWD ────────────────────────────────────── */
+    @media (max-width: 768px) {
+
+      /* 漢堡按鈕顯示 */
+      .menu-toggle { display: flex; align-items: center; justify-content: center }
+
+      /* Topbar */
+      .topbar { padding: 0 14px; gap: 8px }
+      .topbar-title { flex: 1; font-size: 14px }
+
+      /* 側邊欄：收起至畫面左側，點漢堡後滑入 */
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        z-index: 300;
+        width: 240px
+      }
+      .sidebar.open { transform: translateX(0) }
+
+      /* 主內容區全寬 */
+      .main { margin-left: 0 }
+
+      /* 內容區留更多底部空白（行動裝置瀏覽器底部欄） */
+      .content { padding: 16px 14px 110px }
+
+      /* 統計格：2欄 */
+      .stats { grid-template-columns: 1fr 1fr; gap: 10px }
+      .statn { font-size: 22px }
+
+      /* 表單格：1欄 */
+      .grid2 { grid-template-columns: 1fr }
+
+      /* 兩欄排版 → 1欄 */
+      .two { grid-template-columns: 1fr }
+
+      /* 卡片內距縮小 */
+      .card { padding: 14px }
+
+      /* 頁面標題 */
+      .ph h2 { font-size: 17px }
+      .ph { margin-bottom: 16px }
+
+      /* 費用明細列：手機改為兩欄包裝 */
+      .eihdr { display: none }
+      .eirow {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 6px;
+        background: var(--surface2);
+        border-radius: var(--r);
+        padding: 8px;
+        border: 1px solid var(--border)
+      }
+      .eirow > *:last-child { grid-column: span 2; justify-self: end }
+
+      /* 入職步驟：縮小文字 */
+      .obstep span { font-size: 10px }
+      .obdot { width: 26px; height: 26px; font-size: 11px }
+
+      /* AI 面板：滿版 */
+      .aipanel { right: 8px; left: 8px; width: auto; bottom: 80px }
+      .aitoggle { right: 16px; bottom: 16px }
+
+      /* Toast 通知 */
+      .toast { right: 8px; left: 8px; max-width: none }
+
+      /* 登入框 */
+      .login-box { width: calc(100vw - 48px); padding: 32px 24px }
+    }
+
+    @media (max-width: 400px) {
+      .stats { grid-template-columns: 1fr }
+    }
   </style>
 </head>
 
@@ -945,6 +1043,9 @@
       <div class="login-err" id="pw-err"></div>
     </div>
   </div>
+
+  <!-- 手機側邊欄遮罩 -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
   <div class="app">
 
@@ -1021,6 +1122,11 @@
 
     <main class="main">
       <div class="topbar">
+        <button class="menu-toggle" onclick="toggleSidebar()" aria-label="選單">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
         <span class="topbar-title" id="topbar-title">總覽</span>
         <button class="btn btnsm" onclick="toggleAI()">AI 助理</button>
       </div>
@@ -1488,6 +1594,15 @@
     var PAGE_TITLES = { dashboard: '總覽', leave: '請假申請', expense: '報帳申請', onboarding: '員工入職報到', checkin: '員工簽到', directory: '員工查詢', tracker: '審核追蹤', settings: 'Notion 設定' };
 
     // ── Navigation ─────────────────────────────────────────
+    function toggleSidebar() {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    }
+    function closeSidebar() {
+      document.querySelector('.sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    }
+
     function navTo(id, el) {
       document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
       document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.remove('active'); });
@@ -1495,6 +1610,8 @@
       if (el) el.classList.add('active');
       document.getElementById('topbar-title').textContent = PAGE_TITLES[id] || id;
       if (id === 'tracker') loadNotionData();
+      // 手機版：選完頁面後自動關閉選單
+      if (window.innerWidth <= 768) closeSidebar();
     }
 
     // ── Leave ──────────────────────────────────────────────
