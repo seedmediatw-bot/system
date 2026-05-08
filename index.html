@@ -2194,7 +2194,7 @@
         '申請編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
         '合計金額': { number: parseInt(d.total.replace(/,/g, '')) || 0 }, '費用明細': { rich_text: rt(items) },
         '專案用途': { rich_text: rt(d.project) }, '帳號末5碼': { rich_text: rt(d.bank) },
-        '收據連結': { url: d.receipt || null }, '審核狀態': { select: { name: '待主管審核' } }
+        '審核狀態': { select: { name: '待主管審核' } }
       };
     }
     function buildOnboardingProps(d) {
