@@ -1298,6 +1298,52 @@
               </div>
             </div>
           </div>
+          <div class="card" style="border-color:#b8cef0;background:var(--accent-bg)">
+            <!-- 標題 + 模式切換 -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div class="ct" style="color:var(--accent);margin-bottom:0">✦ 收據 / 發票</div>
+              <div style="display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px">
+                <button id="mode-btn-normal" onclick="switchScanMode('normal')"
+                  style="padding:5px 12px;font-size:12px;font-weight:500;border:none;border-radius:6px;cursor:pointer;background:var(--text);color:#fff;font-family:inherit">一般模式</button>
+                <button id="mode-btn-ai" onclick="switchScanMode('ai')"
+                  style="padding:5px 12px;font-size:12px;font-weight:500;border:none;border-radius:6px;cursor:pointer;background:transparent;color:var(--text2);font-family:inherit">AI 辨識</button>
+              </div>
+            </div>
+
+            <!-- 一般模式 -->
+            <div id="scan-mode-normal">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+                <label class="btn btnsm" style="cursor:pointer;background:var(--accent);color:#fff;border-color:var(--accent)">
+                  📷 即時拍照
+                  <input type="file" id="normal-camera" accept="image/*" capture="environment" style="display:none" onchange="addNormalPhoto(this)">
+                </label>
+                <label class="btn btnsm" style="cursor:pointer">
+                  🖼️ 從相簿選取
+                  <input type="file" id="normal-gallery" multiple accept="image/*" style="display:none" onchange="addNormalPhoto(this)">
+                </label>
+              </div>
+              <div id="normal-photo-list" style="display:flex;flex-wrap:wrap;gap:8px;min-height:0"></div>
+              <div id="normal-photo-empty" style="font-size:12px;color:var(--text3)">尚未加入任何圖片</div>
+            </div>
+
+            <!-- AI 辨識模式 -->
+            <div id="scan-mode-ai" style="display:none">
+              <div class="notice" style="margin-bottom:12px">AI 自動辨識發票內容並填入費用明細。需先在「Notion 設定」填入 Gemini API Key。</div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <label class="btn btnsm" style="cursor:pointer;background:var(--accent);color:#fff;border-color:var(--accent)">
+                  📷 即時拍照
+                  <input type="file" id="invoice-camera" accept="image/*" capture="environment" style="display:none" onchange="mergeInvoiceFiles(this)">
+                </label>
+                <label class="btn btnsm" style="cursor:pointer">
+                  🖼️ 從相簿 / 檔案選取
+                  <input type="file" id="invoice-gallery" multiple accept="image/*" style="display:none" onchange="mergeInvoiceFiles(this)">
+                </label>
+                <span id="ai-scan-files" style="font-size:12px;color:var(--text2)">尚未選擇圖片</span>
+                <button class="btn btnsm" id="ai-scan-btn" style="display:none;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="aiScanInvoices()">✦ 開始辨識</button>
+              </div>
+              <div id="ai-scan-status" style="font-size:12px;margin-top:10px;min-height:18px"></div>
+            </div>
+          </div>
           <div class="card">
             <div class="ct">費用明細</div>
             <div class="eihdr"><span>項目說明</span><span>類別</span><span>日期</span><span
@@ -1578,6 +1624,18 @@
             </div>
           </div>
           <div class="card">
+            <div class="ct">AI 發票辨識 — Gemini API Key</div>
+            <div class="notice">取得方式：前往 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> 建立 API Key。Key 只會存在本機 localStorage，不會上傳。</div>
+            <div class="fg" style="margin-bottom:12px">
+              <label>Gemini API Key</label>
+              <div class="trwrap">
+                <input type="password" id="gemini-key" placeholder="AIza...">
+                <span class="trtoggle" onclick="(function(){var i=document.getElementById('gemini-key'),b=this;if(i.type==='password'){i.type='text';b.textContent='隱藏';}else{i.type='password';b.textContent='顯示';}}).call(this)">顯示</span>
+              </div>
+            </div>
+            <button class="btn btnp btnsm" onclick="saveGeminiKey()">儲存 API Key</button>
+          </div>
+          <div class="card">
             <div class="ct">串接狀態</div>
             <div id="nstatus-detail" style="font-size:13px;color:var(--text3)">尚未設定。</div>
           </div>
@@ -1647,6 +1705,7 @@
       checkin: '2c99853a8c8c477aac90d188ad2362ce',
       accounts: '4a4198896f524cf8be6beda5e6778483'
     };
+    var GEMINI_API_KEY = localStorage.getItem('geminiKey') || '';
     var RECORDS = [];
     var eiCount = 0;
     var aiOpen = false;
@@ -1774,6 +1833,116 @@
         note: document.getElementById('e-note').value
       };
       pushNotion('expense', data);
+    }
+
+    // ── AI 發票辨識 ────────────────────────────────────────
+    var _invoiceFiles = [];   // AI 模式累積圖片
+    var _normalPhotos = [];   // 一般模式縮圖 blob URLs
+
+    function switchScanMode(mode) {
+      var isAI = mode === 'ai';
+      document.getElementById('scan-mode-normal').style.display = isAI ? 'none' : '';
+      document.getElementById('scan-mode-ai').style.display    = isAI ? '' : 'none';
+      document.getElementById('mode-btn-normal').style.background = isAI ? 'transparent' : 'var(--text)';
+      document.getElementById('mode-btn-normal').style.color    = isAI ? 'var(--text2)' : '#fff';
+      document.getElementById('mode-btn-ai').style.background   = isAI ? 'var(--text)' : 'transparent';
+      document.getElementById('mode-btn-ai').style.color        = isAI ? '#fff' : 'var(--text2)';
+    }
+
+    function addNormalPhoto(input) {
+      Array.from(input.files).forEach(function(file) {
+        var url = URL.createObjectURL(file);
+        var idx = _normalPhotos.length;
+        _normalPhotos.push(url);
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;width:72px;height:72px;flex-shrink:0';
+        wrap.id = 'nphoto-' + idx;
+        wrap.innerHTML = '<img src="' + url + '" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block">'
+          + '<button onclick="removeNormalPhoto(' + idx + ')" style="position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:var(--danger);color:#fff;border:none;font-size:10px;cursor:pointer;line-height:18px;padding:0;text-align:center">✕</button>';
+        document.getElementById('normal-photo-list').appendChild(wrap);
+        input.value = '';
+      });
+      document.getElementById('normal-photo-empty').style.display = _normalPhotos.length ? 'none' : '';
+    }
+
+    function removeNormalPhoto(idx) {
+      URL.revokeObjectURL(_normalPhotos[idx]);
+      _normalPhotos[idx] = null;
+      var el = document.getElementById('nphoto-' + idx);
+      if (el) el.remove();
+      var any = _normalPhotos.some(function(u){ return u; });
+      document.getElementById('normal-photo-empty').style.display = any ? 'none' : '';
+    }
+
+    function mergeInvoiceFiles(input) {
+      Array.from(input.files).forEach(function(f) { _invoiceFiles.push(f); });
+      var filesEl = document.getElementById('ai-scan-files');
+      var btnEl = document.getElementById('ai-scan-btn');
+      filesEl.textContent = '已選 ' + _invoiceFiles.length + ' 張';
+      btnEl.style.display = _invoiceFiles.length ? 'inline-flex' : 'none';
+      document.getElementById('ai-scan-status').textContent = '';
+    }
+
+    function aiScanInvoices() {
+      var statusEl = document.getElementById('ai-scan-status');
+      if (!_invoiceFiles.length) return;
+      if (!GEMINI_API_KEY) {
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = '✕ 請先在「Notion 設定」填入 Gemini API Key';
+        return;
+      }
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = 'AI 辨識中（' + _invoiceFiles.length + ' 張）...';
+      document.getElementById('ai-scan-btn').disabled = true;
+      var reads = _invoiceFiles.map(function(file) {
+        return new Promise(function(resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            resolve({ mimeType: file.type || 'image/jpeg', data: e.target.result.split(',')[1] });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+      Promise.all(reads).then(function(images) {
+        var parts = images.map(function(img) {
+          return { inlineData: { mimeType: img.mimeType, data: img.data } };
+        });
+        parts.push({ text: '請辨識這' + images.length + '張發票/收據。只回傳 JSON 陣列，不要其他文字，格式：[{"desc":"費用說明","cat":"交通費","date":"YYYY-MM-DD","amount":數字},...]。類別只能是：' + CATS.join('、') + '。' });
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_API_KEY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: parts }] })
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var text = data.candidates && data.candidates[0] ? data.candidates[0].content.parts[0].text : '';
+        var json = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        var items = JSON.parse(json);
+        items.forEach(function(item) {
+          addEI(item.desc || '', item.cat || '', item.date || '', item.amount || 0);
+        });
+        statusEl.style.color = 'var(--success)';
+        statusEl.textContent = '✓ 辨識完成，已自動填入 ' + items.length + ' 筆費用';
+        // 清空
+        _invoiceFiles = [];
+        document.getElementById('ai-scan-files').textContent = '尚未選擇圖片';
+        document.getElementById('ai-scan-btn').style.display = 'none';
+        document.getElementById('ai-scan-btn').disabled = false;
+        document.getElementById('invoice-camera').value = '';
+        document.getElementById('invoice-gallery').value = '';
+      })
+      .catch(function(e) {
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = '✕ 辨識失敗：' + (e.message || '請確認 Gemini API Key 是否正確');
+        document.getElementById('ai-scan-btn').disabled = false;
+      });
+    }
+    function saveGeminiKey() {
+      GEMINI_API_KEY = document.getElementById('gemini-key').value.trim();
+      localStorage.setItem('geminiKey', GEMINI_API_KEY);
+      showToast('Gemini API Key 已儲存', 'ok');
     }
 
     // ── Onboarding ─────────────────────────────────────────
@@ -2109,6 +2278,7 @@
         : '尚未設定 Notion Token。';
       if (nToken) document.getElementById('notion-token').value = nToken;
       ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
+      var gEl = document.getElementById('gemini-key'); if (gEl) gEl.value = GEMINI_API_KEY;
     }
     function toggleTok() {
       var i = document.getElementById('notion-token'), b = document.querySelector('.trtoggle');
