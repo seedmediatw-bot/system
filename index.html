@@ -2789,8 +2789,8 @@ function loadClients() {
           '<div class="client-meta">' + (c.action || '尚無下一步') + (c.nextdate ? ' · 跟進：' + c.nextdate : '') + '</div>' +
         '</div>' +
         '<div class="client-tags">' +
-          (c.status ? '<span class="tag ' + sc + '">' + c.status + '</span>' : '') +
-          (c.priority ? '<span class="tag ' + pc + '">' + c.priority + '</span>' : '') +
+          (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + c.status + '</span>' : '') +
+          (c.priority ? '<span class="tag ' + pc + '"><small style="opacity:0.7">優先：</small>' + c.priority + '</span>' : '') +
         '</div>' +
       '</div>';
     }).join('');
