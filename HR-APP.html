@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR 自動化系統</title>
+  <style>
+    #login-overlay {
+      position: fixed;
+      inset: 0;
+      background: #1a1916;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999
+    }
+    #login-overlay.hidden { display: none }
+    .login-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 40px 36px;
+      width: 340px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3)
+    }
+    .login-box h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #1a1916
+    }
+    .login-box p {
+      font-size: 13px;
+      color: #6b6860;
+      margin-bottom: 24px
+    }
+    .login-box input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid #e2e0d8;
+      border-radius: 10px;
+      font-size: 20px;
+      letter-spacing: 6px;
+      text-align: center;
+      outline: none;
+      background: #f5f4f0;
+      margin-bottom: 12px;
+      font-family: monospace
+    }
+    .login-box input:focus { border-color: #2a5caa; background: #fff }
+    .login-btn {
+      width: 100%;
+      padding: 11px;
+      background: #1a1916;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit
+    }
+    .login-btn:hover { background: #333 }
+    .login-err {
+      font-size: 12px;
+      color: #b02a2a;
+      margin-top: 10px;
+      min-height: 18px
+    }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #f5f4f0;
+      --surface: #fff;
+      --surface2: #f0efe9;
+      --border: #e2e0d8;
+      --border2: #ccc9bf;
+      --text: #1a1916;
+      --text2: #6b6860;
+      --text3: #9e9b92;
+      --accent: #2a5caa;
+      --accent-bg: #eef3fb;
+      --success: #1a7a4a;
+      --success-bg: #eaf5f0;
+      --warning: #8a5a00;
+      --warning-bg: #fef8ec;
+      --danger: #b02a2a;
+      --danger-bg: #fdf0f0;
+      --r: 10px;
+      --rl: 14px;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .06), 0 4px 12px rgba(0, 0, 0, .04)
+    }
+
+    body {
+      font-family: "Noto Sans TC", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh
+    }
+
+    .sidebar {
+      width: 220px;
+      background: var(--text);
+      color: #e8e6e0;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 100
+    }
+
+    .logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, .08)
+    }
+
+    .logo h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff
+    }
+
+    .logo p {
+      font-size: 11px;
+      color: rgba(255, 255, 255, .4);
+      margin-top: 2px
+    }
+
+    .sidenav {
+      padding: 16px 10px;
+      flex: 1
+    }
+
+    .nav-sec {
+      font-size: 10px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, .3);
+      letter-spacing: .08em;
+      padding: 0 10px;
+      margin: 12px 0 6px
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, .6);
+      font-size: 13px;
+      transition: all .15s;
+      user-select: none
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, .07);
+      color: #fff
+    }
+
+    .nav-item.active {
+      background: rgba(255, 255, 255, .12);
+      color: #fff;
+      font-weight: 500
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      opacity: .7
+    }
+
+    .nav-item.active svg {
+      opacity: 1
+    }
+
+    .nstatus {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(255, 255, 255, .08);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .ndot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #555;
+      flex-shrink: 0
+    }
+
+    .ndot.on {
+      background: #4ade80
+    }
+
+    .nlabel {
+      color: rgba(255, 255, 255, .5)
+    }
+
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      display: flex;
+      flex-direction: column
+    }
+
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50
+    }
+
+    .topbar-title {
+      font-size: 15px;
+      font-weight: 500
+    }
+
+    .content {
+      padding: 28px 32px 90px;
+      flex: 1
+    }
+
+    .page {
+      display: none
+    }
+
+    .page.active {
+      display: block
+    }
+
+    .ph {
+      margin-bottom: 24px
+    }
+
+    .ph h2 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -.02em
+    }
+
+    .ph p {
+      font-size: 13px;
+      color: var(--text2);
+      margin-top: 4px
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--rl);
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow)
+    }
+
+    .ct {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      letter-spacing: .04em;
+      margin-bottom: 16px
+    }
+
+    .fg {
+      display: flex;
+      flex-direction: column;
+      gap: 5px
+    }
+
+    .fg label {
+      font-size: 12px;
+      color: var(--text2);
+      font-weight: 500
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px
+    }
+
+    .grid1 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-bottom: 14px
+    }
+
+    input[type=text],
+    input[type=email],
+    input[type=date],
+    input[type=number],
+    input[type=password],
+    select,
+    textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      background: #fff
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px
+    }
+
+    .btn {
+      padding: 9px 18px;
+      border-radius: var(--r);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--text);
+      transition: all .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit
+    }
+
+    .btn:hover {
+      background: var(--surface2)
+    }
+
+    .btnp {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text)
+    }
+
+    .btnp:hover {
+      background: #333
+    }
+
+    .btnsm {
+      padding: 6px 12px;
+      font-size: 12px
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 500
+    }
+
+    .tgray {
+      background: var(--surface2);
+      color: var(--text2);
+      border: 1px solid var(--border)
+    }
+
+    .tblue {
+      background: var(--accent-bg);
+      color: var(--accent);
+      border: 1px solid #b8cef0
+    }
+
+    .tgreen {
+      background: var(--success-bg);
+      color: var(--success)
+    }
+
+    .tyellow {
+      background: var(--warning-bg);
+      color: var(--warning)
+    }
+
+    .tred {
+      background: var(--danger-bg);
+      color: var(--danger)
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--rl);
+      padding: 16px 20px;
+      box-shadow: var(--shadow)
+    }
+
+    .statn {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -.02em
+    }
+
+    .statl {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 2px
+    }
+
+    .tw {
+      overflow-x: auto
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border)
+    }
+
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text)
+    }
+
+    tr:last-child td {
+      border-bottom: none
+    }
+
+    tr:hover td {
+      background: var(--bg)
+    }
+
+    .notice {
+      font-size: 12px;
+      color: var(--text2);
+      padding: 10px 14px;
+      border-left: 3px solid #b8cef0;
+      background: var(--accent-bg);
+      border-radius: 0 var(--r) var(--r) 0;
+      margin-top: 8px
+    }
+
+    .eirow {
+      display: grid;
+      grid-template-columns: 2fr 1fr 120px 90px 36px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px
+    }
+
+    .eihdr {
+      display: grid;
+      grid-template-columns: 2fr 1fr 120px 90px 36px;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text3);
+      padding: 0 2px 6px;
+      font-weight: 600;
+      letter-spacing: .04em
+    }
+
+    .av {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0
+    }
+
+    .obsteps {
+      display: flex;
+      align-items: center;
+      margin-bottom: 24px
+    }
+
+    .obstep {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer
+    }
+
+    .obdot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--border2);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text3);
+      transition: all .2s
+    }
+
+    .obstep span {
+      font-size: 12px;
+      color: var(--text3);
+      white-space: nowrap
+    }
+
+    .obstep.active .obdot {
+      background: var(--text);
+      border-color: var(--text);
+      color: #fff
+    }
+
+    .obstep.active span {
+      color: var(--text);
+      font-weight: 500
+    }
+
+    .obstep.done .obdot {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff
+    }
+
+    .obstep.done span {
+      color: var(--success)
+    }
+
+    .obline {
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      margin: 0 8px 18px;
+      transition: background .2s
+    }
+
+    .obline.done {
+      background: var(--success)
+    }
+
+    .tl {
+      display: flex
+    }
+
+    .tlstep {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative
+    }
+
+    .tlstep:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 100%;
+      height: 1.5px;
+      background: var(--border);
+      z-index: 0
+    }
+
+    .tlstep.done:not(:last-child)::after {
+      background: var(--success)
+    }
+
+    .tldot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border2);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      z-index: 1;
+      position: relative
+    }
+
+    .tlstep.done .tldot {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff
+    }
+
+    .tlstep.cur .tldot {
+      background: var(--warning-bg);
+      border-color: var(--warning);
+      color: var(--warning)
+    }
+
+    .tlstep.rej .tldot {
+      background: var(--danger-bg);
+      border-color: var(--danger);
+      color: var(--danger)
+    }
+
+    .tllbl {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 4px;
+      text-align: center
+    }
+
+    .cfgbox {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px;
+      margin-bottom: 14px
+    }
+
+    .cfgbox h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px
+    }
+
+    .trwrap {
+      position: relative
+    }
+
+    .trwrap input {
+      padding-right: 80px;
+      font-family: monospace;
+      font-size: 12px
+    }
+
+    .trtoggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: var(--accent);
+      cursor: pointer;
+      padding: 2px 6px
+    }
+
+    .ltgrid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px
+    }
+
+    .lt {
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text2);
+      transition: all .15s
+    }
+
+    .lt.on {
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-color: #b8cef0
+    }
+
+    .dc {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border-radius: var(--r);
+      border: 1px solid var(--border)
+    }
+
+    .dcn {
+      font-size: 22px;
+      font-weight: 700
+    }
+
+    .aipanel {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 360px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--rl);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .12);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      max-height: 480px;
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: all .2s
+    }
+
+    .aipanel.open {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: all
+    }
+
+    .aihdr {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0
+    }
+
+    .aihdr-t {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .aidot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 2s infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .4
+      }
+    }
+
+    .aimsgs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 160px
+    }
+
+    .aimsg {
+      max-width: 88%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      line-height: 1.55
+    }
+
+    .aimsg.bot {
+      background: var(--surface2);
+      color: var(--text);
+      align-self: flex-start;
+      border-bottom-left-radius: 3px
+    }
+
+    .aimsg.user {
+      background: var(--text);
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 3px
+    }
+
+    .aiinprow {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0
+    }
+
+    .aiinprow input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      outline: none;
+      font-family: inherit
+    }
+
+    .aiinprow input:focus {
+      border-color: var(--accent)
+    }
+
+    .aisend {
+      padding: 8px 12px;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit
+    }
+
+    .aitoggle {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 48px;
+      height: 48px;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .2);
+      z-index: 199;
+      transition: transform .15s
+    }
+
+    .aitoggle:hover {
+      transform: scale(1.05)
+    }
+
+    .aitoggle svg {
+      width: 20px;
+      height: 20px
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      right: 24px;
+      background: var(--text);
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: var(--r);
+      font-size: 13px;
+      z-index: 300;
+      transform: translateY(60px);
+      opacity: 0;
+      transition: all .25s;
+      max-width: 300px
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1
+    }
+
+    .toast.ok {
+      background: var(--success)
+    }
+
+    .toast.err {
+      background: var(--danger)
+    }
+
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px
+    }
+
+    .empty {
+      text-align: center;
+      padding: 40px;
+      color: var(--text3);
+      font-size: 13px
+    }
+
+    .qa {
+      display: flex;
+      flex-direction: column;
+      gap: 10px
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 密碼保護 -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2>HR 自動化系統</h2>
+      <p>請輸入系統密碼</p>
+      <input type="password" id="pw-input" maxlength="8" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" onclick="doLogin()">進入系統</button>
+      <div class="login-err" id="pw-err"></div>
+    </div>
+  </div>
+
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="logo">
+        <h1>HR 系統</h1>
+        <p>Office Automation</p>
+      </div>
+      <div class="sidenav">
+        <div class="nav-sec">主選單</div>
+        <div class="nav-item active" onclick="navTo('dashboard',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+          <span>總覽</span>
+        </div>
+        <div class="nav-sec">申請</div>
+        <div class="nav-item" onclick="navTo('leave',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          <span>請假申請</span>
+        </div>
+        <div class="nav-item" onclick="navTo('expense',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="9" y1="15" x2="15" y2="15" />
+            <line x1="9" y1="12" x2="15" y2="12" />
+          </svg>
+          <span>報帳申請</span>
+        </div>
+        <div class="nav-item" onclick="navTo('onboarding',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+          <span>員工入職</span>
+        </div>
+        <div class="nav-item" onclick="navTo('checkin',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>員工簽到</span>
+        </div>
+        <div class="nav-sec">查詢</div>
+        <div class="nav-item" onclick="navTo('directory',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>員工查詢</span>
+        </div>
+        <div class="nav-item" onclick="navTo('tracker',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+          <span>審核追蹤</span>
+        </div>
+        <div class="nav-sec">設定</div>
+        <div class="nav-item" onclick="navTo('settings',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
+          </svg>
+          <span>Notion 設定</span>
+        </div>
+      </div>
+      <div class="nstatus">
+        <div class="ndot" id="ndot"></div><span class="nlabel" id="nlabel">未連接 Notion</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <span class="topbar-title" id="topbar-title">總覽</span>
+        <button class="btn btnsm" onclick="toggleAI()">AI 助理</button>
+      </div>
+      <div class="content">
+
+        <!-- Dashboard -->
+        <div class="page active" id="page-dashboard">
+          <div class="ph">
+            <h2>總覽</h2>
+            <p>今日概況與快速操作</p>
+          </div>
+          <div class="stats">
+            <div class="stat">
+              <div class="statn" id="s-pending">0</div>
+              <div class="statl">待審核申請</div>
+            </div>
+            <div class="stat">
+              <div class="statn" id="s-approved">0</div>
+              <div class="statl">本月已核准</div>
+            </div>
+            <div class="stat">
+              <div class="statn" id="s-emp">0</div>
+              <div class="statl">在職員工</div>
+            </div>
+            <div class="stat">
+              <div class="statn" id="s-expense">NT$0</div>
+              <div class="statl">本月報帳金額</div>
+            </div>
+          </div>
+          <div class="two">
+            <div class="card">
+              <div class="ct">近期申請</div>
+              <div id="dash-recent">
+                <div class="empty">尚無申請紀錄</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ct">快速操作</div>
+              <div class="qa">
+                <button class="btn" onclick="navTo('leave',null)">申請請假</button>
+                <button class="btn" onclick="navTo('expense',null)">提交報帳</button>
+                <button class="btn" onclick="navTo('onboarding',null)">新員工入職</button>
+                <button class="btn" onclick="navTo('tracker',null)">查看審核進度</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leave -->
+        <div class="page" id="page-leave">
+          <div class="ph">
+            <h2>請假申請</h2>
+            <p>填寫完成後送出，主管將收到通知進行審核</p>
+          </div>
+          <div class="card">
+            <div class="ct">申請人資訊</div>
+            <div class="grid2">
+              <div class="fg"><label>姓名 *</label><input type="text" id="l-name" placeholder="王小明"></div>
+              <div class="fg"><label>部門 *</label><select id="l-dept">
+                  <option value="">選擇部門</option>
+                  <option>工程部</option>
+                  <option>行銷部</option>
+                  <option>人事部</option>
+                  <option>財務部</option>
+                  <option>業務部</option>
+                </select></div>
+              <div class="fg"><label>員工編號</label><input type="text" id="l-empid" placeholder="EMP-0001"></div>
+              <div class="fg"><label>Email</label><input type="email" id="l-email" placeholder="wang@company.com"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ct">請假資訊</div>
+            <div style="margin-bottom:14px">
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500">假別</div>
+              <div class="ltgrid">
+                <span class="lt on" data-t="特休" onclick="selLT(this)">特休</span>
+                <span class="lt" data-t="病假" onclick="selLT(this)">病假</span>
+                <span class="lt" data-t="事假" onclick="selLT(this)">事假</span>
+                <span class="lt" data-t="公假" onclick="selLT(this)">公假</span>
+                <span class="lt" data-t="其他" onclick="selLT(this)">其他</span>
+              </div>
+              <input type="hidden" id="l-type" value="特休">
+            </div>
+            <div class="grid2">
+              <div class="fg"><label>開始日期 *</label><input type="date" id="l-start" onchange="calcDays()"></div>
+              <div class="fg"><label>結束日期 *</label><input type="date" id="l-end" onchange="calcDays()"></div>
+              <div class="fg"><label>半天選項</label><select id="l-half" onchange="calcDays()">
+                  <option value="full">全天</option>
+                  <option value="am">上半天</option>
+                  <option value="pm">下半天</option>
+                </select></div>
+              <div class="fg"><label>請假天數</label>
+                <div class="dc"><span class="dcn" id="l-days">0</span><span style="color:var(--text3)">天</span></div>
+              </div>
+            </div>
+            <div class="grid1">
+              <div class="fg"><label>請假原因</label><textarea id="l-reason" placeholder="請簡述原因..."></textarea></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ct">代理人</div>
+            <div class="grid2">
+              <div class="fg"><label>代理人姓名</label><input type="text" id="l-proxy" placeholder="李小花"></div>
+              <div class="fg"><label>代理人 Email</label><input type="email" id="l-proxy-email"
+                  placeholder="lee@company.com"></div>
+            </div>
+            <div class="notice">代理人將收到通知，請確認對方已同意代理。</div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn" onclick="resetLeave()">清除</button>
+            <button class="btn btnp" onclick="submitLeave()">送出申請</button>
+          </div>
+        </div>
+
+        <!-- Expense -->
+        <div class="page" id="page-expense">
+          <div class="ph">
+            <h2>報帳申請</h2>
+            <p>填寫費用明細後送出</p>
+          </div>
+          <div class="card">
+            <div class="ct">申請人資訊</div>
+            <div class="grid2">
+              <div class="fg"><label>姓名 *</label><input type="text" id="e-name" placeholder="王小明"></div>
+              <div class="fg"><label>部門 *</label><select id="e-dept">
+                  <option value="">選擇部門</option>
+                  <option>工程部</option>
+                  <option>行銷部</option>
+                  <option>人事部</option>
+                  <option>財務部</option>
+                  <option>業務部</option>
+                </select></div>
+              <div class="fg"><label>員工編號</label><input type="text" id="e-empid" placeholder="EMP-0001"></div>
+              <div class="fg"><label>匯款帳號末5碼</label><input type="text" id="e-bank" placeholder="12345" maxlength="5">
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ct">費用明細</div>
+            <div class="eihdr"><span>項目說明</span><span>類別</span><span>日期</span><span
+                style="text-align:right">NT$</span><span></span></div>
+            <div id="ei-list"></div>
+            <button class="btn btnsm" onclick="addEI()"
+              style="width:100%;margin-top:6px;justify-content:center;border-style:dashed">+ 新增費用項目</button>
+            <div
+              style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface2);border-radius:var(--r);margin-top:12px;border:1px solid var(--border)">
+              <span style="font-size:13px;color:var(--text2)">合計金額</span>
+              <span style="font-size:20px;font-weight:700">NT$ <span id="ei-total">0</span></span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ct">補充說明</div>
+            <div class="grid1">
+              <div class="fg"><label>專案 / 用途</label><input type="text" id="e-project" placeholder="例：Q2 行銷活動"></div>
+              <div class="fg"><label>備註</label><textarea id="e-note" placeholder="其他補充說明..."></textarea></div>
+            </div>
+            <div class="notice">請檢附收據或發票，財務部審核後 5 個工作天內匯款。</div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn" onclick="resetExpense()">清除</button>
+            <button class="btn btnp" onclick="submitExpense()">送出申請</button>
+          </div>
+        </div>
+
+        <!-- Onboarding -->
+        <div class="page" id="page-onboarding">
+          <div class="ph">
+            <h2>員工入職報到</h2>
+            <p>新進員工填寫基本資料與緊急聯絡人後送出</p>
+          </div>
+          <div class="obsteps">
+            <div class="obstep active" data-s="1" onclick="obStep(1)">
+              <div class="obdot" id="od1">1</div><span>基本資料</span>
+            </div>
+            <div class="obline" id="obline"></div>
+            <div class="obstep" data-s="2" onclick="obStep(2)">
+              <div class="obdot" id="od2">2</div><span>緊急聯絡人</span>
+            </div>
+          </div>
+          <div id="ob-p1">
+            <div class="card">
+              <div class="ct">個人基本資料</div>
+              <div class="grid2">
+                <div class="fg"><label>中文姓名 *</label><input type="text" id="ob-name" placeholder="王小明"></div>
+                <div class="fg"><label>英文姓名</label><input type="text" id="ob-ename" placeholder="Ming Wang"></div>
+                <div class="fg"><label>身分證字號 *</label><input type="text" id="ob-id" placeholder="A123456789"></div>
+                <div class="fg"><label>出生日期 *</label><input type="date" id="ob-birth"></div>
+                <div class="fg"><label>性別</label><select id="ob-gender">
+                    <option value="">請選擇</option>
+                    <option>男</option>
+                    <option>女</option>
+                    <option>不願透露</option>
+                  </select></div>
+                <div class="fg"><label>婚姻狀況</label><select id="ob-marital">
+                    <option value="">請選擇</option>
+                    <option>未婚</option>
+                    <option>已婚</option>
+                    <option>離婚</option>
+                  </select></div>
+                <div class="fg"><label>手機號碼 *</label><input type="text" id="ob-phone" placeholder="0912-345-678"></div>
+                <div class="fg"><label>個人 Email *</label><input type="email" id="ob-email"
+                    placeholder="personal@gmail.com"></div>
+              </div>
+              <div class="grid1">
+                <div class="fg"><label>通訊地址</label><input type="text" id="ob-addr" placeholder="台北市信義區..."></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ct">到職資訊</div>
+              <div class="grid2">
+                <div class="fg"><label>到職日期 *</label><input type="date" id="ob-join"></div>
+                <div class="fg"><label>部門 *</label><select id="ob-dept">
+                    <option value="">選擇部門</option>
+                    <option>工程部</option>
+                    <option>行銷部</option>
+                    <option>人事部</option>
+                    <option>財務部</option>
+                    <option>業務部</option>
+                  </select></div>
+                <div class="fg"><label>職稱 *</label><input type="text" id="ob-title" placeholder="工程師"></div>
+                <div class="fg"><label>直屬主管</label><input type="text" id="ob-mgr" placeholder="陳總監"></div>
+                <div class="fg"><label>工作地點</label><select id="ob-loc">
+                    <option>台北總部</option>
+                    <option>新竹辦公室</option>
+                    <option>台中辦公室</option>
+                    <option>高雄辦公室</option>
+                    <option>遠端</option>
+                  </select></div>
+                <div class="fg"><label>雇用類型</label><select id="ob-etype">
+                    <option>正職</option>
+                    <option>約聘</option>
+                    <option>兼職</option>
+                    <option>實習</option>
+                  </select></div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end"><button class="btn btnp" onclick="obStep(2)">下一步：緊急聯絡人
+                →</button></div>
+          </div>
+          <div id="ob-p2" style="display:none">
+            <div class="card">
+              <div class="ct">緊急聯絡人</div>
+              <div class="grid2">
+                <div class="fg"><label>聯絡人姓名 *</label><input type="text" id="ob-ec-name" placeholder="王大華"></div>
+                <div class="fg"><label>與本人關係 *</label><select id="ob-ec-rel">
+                    <option value="">請選擇</option>
+                    <option>父母</option>
+                    <option>配偶</option>
+                    <option>子女</option>
+                    <option>兄弟姊妹</option>
+                    <option>其他</option>
+                  </select></div>
+                <div class="fg"><label>聯絡電話 *</label><input type="text" id="ob-ec-phone" placeholder="0923-456-789">
+                </div>
+                <div class="fg"><label>備用電話</label><input type="text" id="ob-ec-phone2" placeholder="02-1234-5678">
+                </div>
+              </div>
+              <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px">
+                <div class="ct" style="margin-bottom:12px">緊急聯絡人 2（選填）</div>
+                <div class="grid2">
+                  <div class="fg"><label>聯絡人姓名</label><input type="text" id="ob-ec2-name" placeholder="王美華"></div>
+                  <div class="fg"><label>與本人關係</label><select id="ob-ec2-rel">
+                      <option value="">請選擇</option>
+                      <option>父母</option>
+                      <option>配偶</option>
+                      <option>子女</option>
+                      <option>兄弟姊妹</option>
+                      <option>其他</option>
+                    </select></div>
+                  <div class="fg"><label>聯絡電話</label><input type="text" id="ob-ec2-phone" placeholder="0934-567-890">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:space-between">
+              <button class="btn" onclick="obStep(1)">← 上一步</button>
+              <button class="btn btnp" onclick="submitOnboarding()">送出報到資料</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkin -->
+        <div class="page" id="page-checkin">
+          <div class="ph">
+            <h2>員工簽到</h2>
+            <p>記錄上下班時間，送出後自動同步至 Notion</p>
+          </div>
+          <div class="card">
+            <div class="ct">簽到資訊</div>
+            <div class="grid2">
+              <div class="fg"><label>姓名 *</label><input type="text" id="c-name" placeholder="王小明"></div>
+              <div class="fg"><label>日期 *</label><input type="date" id="c-date"></div>
+              <div class="fg"><label>上班時間</label><input type="time" id="c-clockin"></div>
+              <div class="fg"><label>下班時間</label><input type="time" id="c-clockout"></div>
+            </div>
+            <div class="grid1">
+              <div class="fg"><label>備註</label><textarea id="c-note" placeholder="其他補充說明..."></textarea></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn" onclick="resetCheckin()">清除</button>
+            <button class="btn btnp" onclick="submitCheckin()">送出簽到</button>
+          </div>
+        </div>
+
+        <!-- Directory -->
+        <div class="page" id="page-directory">
+          <div class="ph">
+            <h2>員工查詢</h2>
+            <p>查詢員工基本資料與聯絡方式</p>
+          </div>
+          <div class="card" style="padding:16px 20px">
+            <div style="display:grid;grid-template-columns:1fr 160px 130px;gap:10px">
+              <input type="text" id="dir-q" placeholder="搜尋姓名、Email 或員工編號..." oninput="renderDir()">
+              <select id="dir-dept" onchange="renderDir()">
+                <option value="">所有部門</option>
+                <option>工程部</option>
+                <option>行銷部</option>
+                <option>人事部</option>
+                <option>財務部</option>
+                <option>業務部</option>
+              </select>
+              <select id="dir-status" onchange="renderDir()">
+                <option value="">所有狀態</option>
+                <option>在職</option>
+                <option>試用期</option>
+                <option>留職停薪</option>
+              </select>
+            </div>
+          </div>
+          <div class="card" id="dir-detail" style="display:none"></div>
+          <div class="card" style="padding:0">
+            <div class="tw">
+              <table>
+                <thead>
+                  <tr>
+                    <th>姓名</th>
+                    <th>部門</th>
+                    <th>職稱</th>
+                    <th>Email</th>
+                    <th>年資</th>
+                    <th>狀態</th>
+                  </tr>
+                </thead>
+                <tbody id="dir-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tracker -->
+        <div class="page" id="page-tracker">
+          <div class="ph">
+            <h2>審核追蹤</h2>
+            <p>查詢所有申請的審核狀態與進度</p>
+          </div>
+          <div class="stats" id="trk-stats"></div>
+          <div class="card" style="padding:16px 20px">
+            <div style="display:grid;grid-template-columns:1fr 140px 130px 120px;gap:10px">
+              <input type="text" id="trk-q" placeholder="搜尋姓名或申請編號..." oninput="renderTracker()">
+              <select id="trk-dept" onchange="renderTracker()">
+                <option value="">所有部門</option>
+                <option>工程部</option>
+                <option>行銷部</option>
+                <option>人事部</option>
+                <option>財務部</option>
+                <option>業務部</option>
+              </select>
+              <select id="trk-status" onchange="renderTracker()">
+                <option value="">所有狀態</option>
+                <option value="待審核">待審核</option>
+                <option value="已核准">已核准</option>
+                <option value="已駁回">已駁回</option>
+              </select>
+              <select id="trk-type" onchange="renderTracker()">
+                <option value="">所有類型</option>
+                <option value="leave">請假</option>
+                <option value="expense">報帳</option>
+              </select>
+            </div>
+          </div>
+          <div id="trk-list"></div>
+        </div>
+
+        <!-- Settings -->
+        <div class="page" id="page-settings">
+          <div class="ph">
+            <h2>Notion 設定</h2>
+            <p>設定 Notion API 串接，讓申請資料自動同步到 Notion</p>
+          </div>
+          <div class="card">
+            <div class="ct">Integration Token</div>
+            <div class="cfgbox">
+              <h3>取得 Notion Token</h3>
+              <ol style="font-size:13px;color:var(--text2);line-height:2.2;padding-left:18px">
+                <li>前往 <a href="https://www.notion.so/my-integrations" target="_blank"
+                    style="color:var(--accent)">notion.so/my-integrations</a></li>
+                <li>點擊你建立的 Integration → Manage</li>
+                <li>在 Configuration 頁面點「Show」複製 Token（開頭為 <code
+                    style="background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11px">ntn_</code>）</li>
+                <li>到 Content access 頁面點「Edit access」→ 搜尋「HR 自動化系統」→ 儲存</li>
+              </ol>
+            </div>
+            <div class="fg" style="margin-bottom:12px">
+              <label>Integration Token</label>
+              <div class="trwrap">
+                <input type="password" id="notion-token" placeholder="ntn_xxxxxxxxxxxx">
+                <span class="trtoggle" onclick="toggleTok()">顯示</span>
+              </div>
+            </div>
+            <button class="btn btnp" onclick="saveToken()">儲存 Token</button>
+          </div>
+          <div class="card">
+            <div class="ct">資料庫 ID（已預設）</div>
+            <div class="cfgbox">
+              <h3>如何確認 Database ID</h3>
+              <p style="font-size:13px;color:var(--text2);line-height:1.8">在 Notion 開啟資料庫頁面，從 URL 中複製 32 碼英數字即為 Database
+                ID。</p>
+            </div>
+            <div class="grid2">
+              <div class="fg"><label>請假申請 Database ID</label><input type="text" id="db-leave"></div>
+              <div class="fg"><label>報帳申請 Database ID</label><input type="text" id="db-expense"></div>
+              <div class="fg"><label>員工資料庫 Database ID</label><input type="text" id="db-employees"></div>
+              <div class="fg"><label>審核記錄 Database ID</label><input type="text" id="db-approvals"></div>
+              <div class="fg"><label>員工簽到 Database ID</label><input type="text" id="db-checkin"></div>
+            </div>
+            <div style="margin-top:14px;display:flex;gap:10px">
+              <button class="btn btnp" onclick="saveDBs()">儲存設定</button>
+              <button class="btn" onclick="testNotion()">測試連線</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ct">串接狀態</div>
+            <div id="nstatus-detail" style="font-size:13px;color:var(--text3)">尚未設定。</div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- AI Panel -->
+  <div class="aipanel" id="aipanel">
+    <div class="aihdr">
+      <div class="aihdr-t">
+        <div class="aidot"></div>Claude AI 助理
+      </div>
+      <button class="btn btnsm" onclick="toggleAI()">關閉</button>
+    </div>
+    <div class="aimsgs" id="aimsgs">
+      <div class="aimsg bot">你好！我是 HR 系統的 AI 助理，可以協助你操作系統或回答問題。</div>
+    </div>
+    <div class="aiinprow">
+      <input type="text" id="ai-inp" placeholder="輸入問題..." onkeydown="if(event.key==='Enter')sendAI()">
+      <button class="aisend" onclick="sendAI()">送出</button>
+    </div>
+  </div>
+  <button class="aitoggle" id="ai-btn" onclick="toggleAI()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="4" />
+      <path
+        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  </button>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── 密碼驗證 ───────────────────────────────────────────────
+    (function () {
+      if (sessionStorage.getItem('hr_auth') === '1') {
+        document.getElementById('login-overlay').classList.add('hidden');
+      }
+    })();
+    function doLogin() {
+      var pw = document.getElementById('pw-input').value;
+      if (pw === '55306005') {
+        sessionStorage.setItem('hr_auth', '1');
+        document.getElementById('login-overlay').classList.add('hidden');
+      } else {
+        document.getElementById('pw-err').textContent = '密碼錯誤，請再試一次';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+      }
+    }
+
+    // ── API 基礎網址設定 ──────────────────────────────────────
+    // 本地伺服器（預設）：保持空字串 ''
+    // Cloudflare Worker：填入你的 Worker URL
+    //   例如：'https://hr-proxy.你的名稱.workers.dev'
+    var API_BASE = 'https://shy-sun-7610.seedmediatw.workers.dev';
+
+    // ── State ──────────────────────────────────────────────
+    var nToken = localStorage.getItem('nToken') || '';
+    var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {
+      leave: '6846115f39e341a69c8c771f5e229c7c',
+      expense: '2f1e0e588b6a47c1b89d1392eca5272f',
+      employees: 'b1ba6f957a114a828da1b7018949114d',
+      approvals: 'f3f9a9bcc4a9447fb9623723952e33b2',
+      checkin: '2c99853a8c8c477aac90d188ad2362ce'
+    };
+    var RECORDS = [];
+    var DIR_DATA = [];
+    var eiCount = 0;
+    var aiOpen = false;
+    var AVCOLS = [['#E6F1FB', '#0C447C'], ['#E1F5EE', '#085041'], ['#FAEEDA', '#633806'], ['#EEEDFE', '#3C3489'], ['#FAECE7', '#712B13'], ['#EAF3DE', '#27500A']];
+    var CATS = ['交通費', '餐費', '住宿費', '材料費', '軟體訂閱', '培訓費', '其他'];
+    var PAGE_TITLES = { dashboard: '總覽', leave: '請假申請', expense: '報帳申請', onboarding: '員工入職報到', checkin: '員工簽到', directory: '員工查詢', tracker: '審核追蹤', settings: 'Notion 設定' };
+
+    // ── Navigation ─────────────────────────────────────────
+    function navTo(id, el) {
+      document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+      document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.remove('active'); });
+      document.getElementById('page-' + id).classList.add('active');
+      if (el) el.classList.add('active');
+      document.getElementById('topbar-title').textContent = PAGE_TITLES[id] || id;
+      if (id === 'directory') renderDir();
+      if (id === 'tracker') renderTracker();
+    }
+
+    // ── Leave ──────────────────────────────────────────────
+    function selLT(el) {
+      document.querySelectorAll('.lt').forEach(function (t) { t.classList.remove('on'); });
+      el.classList.add('on');
+      document.getElementById('l-type').value = el.dataset.t;
+    }
+    function calcDays() {
+      var s = document.getElementById('l-start').value;
+      var e = document.getElementById('l-end').value;
+      var half = document.getElementById('l-half').value;
+      if (!s || !e) return;
+      var sd = new Date(s), ed = new Date(e);
+      if (ed < sd) { document.getElementById('l-days').textContent = '0'; return; }
+      var d = 0, c = new Date(sd);
+      while (c <= ed) { if (c.getDay() !== 0 && c.getDay() !== 6) d++; c.setDate(c.getDate() + 1); }
+      if (half !== 'full' && d > 0) d -= 0.5;
+      document.getElementById('l-days').textContent = d;
+    }
+    function resetLeave() {
+      ['l-name', 'l-empid', 'l-email', 'l-start', 'l-end', 'l-reason', 'l-proxy', 'l-proxy-email'].forEach(function (id) {
+        var el = document.getElementById(id); if (el) el.value = '';
+      });
+      document.getElementById('l-dept').selectedIndex = 0;
+      document.getElementById('l-half').selectedIndex = 0;
+      document.getElementById('l-days').textContent = '0';
+      document.querySelectorAll('.lt').forEach(function (t, i) { t.classList.toggle('on', i === 0); });
+      document.getElementById('l-type').value = '特休';
+    }
+    function submitLeave() {
+      var name = document.getElementById('l-name').value;
+      var dept = document.getElementById('l-dept').value;
+      var start = document.getElementById('l-start').value;
+      var end = document.getElementById('l-end').value;
+      if (!name || !dept || !start || !end) { showToast('請填寫必填欄位', 'err'); return; }
+      var data = {
+        name: name, dept: dept,
+        type: document.getElementById('l-type').value,
+        start: start, end: end,
+        days: document.getElementById('l-days').textContent,
+        reason: document.getElementById('l-reason').value,
+        empid: document.getElementById('l-empid').value,
+        email: document.getElementById('l-email').value,
+        proxy: document.getElementById('l-proxy').value
+      };
+      pushNotion('leave', data);
+    }
+
+    // ── Expense ────────────────────────────────────────────
+    function addEI(desc, cat, date, amt) {
+      desc = desc || ''; cat = cat || ''; date = date || new Date().toISOString().split('T')[0]; amt = amt || '';
+      eiCount++;
+      var id = 'ei' + eiCount;
+      var div = document.createElement('div');
+      div.className = 'eirow'; div.id = id;
+      div.innerHTML = '<input type="text" placeholder="說明費用內容" value="' + desc + '">'
+        + '<select>' + CATS.map(function (c) { return '<option' + (c === cat ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>'
+        + '<input type="date" value="' + date + '" onchange="calcEI()">'
+        + '<input type="number" min="0" step="1" value="' + amt + '" placeholder="0" style="text-align:right" oninput="calcEI()">'
+        + '<button class="btn btnsm" onclick="document.getElementById(\'' + id + '\').remove();calcEI()" style="padding:6px;width:36px;justify-content:center;border-color:#f0c0c0;color:var(--danger)">✕</button>';
+      document.getElementById('ei-list').appendChild(div);
+      calcEI();
+    }
+    function calcEI() {
+      var inputs = document.querySelectorAll('.eirow input[type=number]');
+      var sum = 0;
+      inputs.forEach(function (i) { sum += parseFloat(i.value) || 0; });
+      document.getElementById('ei-total').textContent = Math.round(sum).toLocaleString();
+    }
+    function resetExpense() {
+      document.getElementById('ei-list').innerHTML = '';
+      ['e-name', 'e-empid', 'e-bank', 'e-project', 'e-note'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+      document.getElementById('e-dept').selectedIndex = 0;
+      document.getElementById('ei-total').textContent = '0';
+      eiCount = 0;
+    }
+    function submitExpense() {
+      var name = document.getElementById('e-name').value;
+      var dept = document.getElementById('e-dept').value;
+      var rows = document.querySelectorAll('.eirow');
+      if (!name || !dept) { showToast('請填寫申請人資訊', 'err'); return; }
+      if (rows.length === 0) { showToast('請新增至少一筆費用', 'err'); return; }
+      var items = Array.from(rows).map(function (r) {
+        var inp = r.querySelectorAll('input'), sel = r.querySelector('select');
+        return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: inp[2].value };
+      });
+      var data = {
+        name: name, dept: dept,
+        total: document.getElementById('ei-total').textContent,
+        items: items,
+        empid: document.getElementById('e-empid').value,
+        bank: document.getElementById('e-bank').value,
+        project: document.getElementById('e-project').value,
+        note: document.getElementById('e-note').value
+      };
+      pushNotion('expense', data);
+    }
+
+    // ── Onboarding ─────────────────────────────────────────
+    function obStep(step) {
+      if (step === 2 && !obVal1()) return;
+      document.getElementById('ob-p1').style.display = step === 1 ? 'block' : 'none';
+      document.getElementById('ob-p2').style.display = step === 2 ? 'block' : 'none';
+      [1, 2].forEach(function (s) {
+        var el = document.querySelector('.obstep[data-s="' + s + '"]');
+        if (!el) return;
+        el.classList.toggle('active', s === step);
+        el.classList.toggle('done', s < step);
+      });
+      document.getElementById('obline').classList.toggle('done', step > 1);
+    }
+    function obVal1() {
+      var req = ['ob-name', 'ob-id', 'ob-birth', 'ob-phone', 'ob-email', 'ob-join', 'ob-dept', 'ob-title'];
+      for (var i = 0; i < req.length; i++) {
+        var el = document.getElementById(req[i]);
+        if (!el || !el.value.trim()) { if (el) el.focus(); showToast('請填寫所有必填欄位（*）', 'err'); return false; }
+      }
+      return true;
+    }
+    function obVal2() {
+      var req = ['ob-ec-name', 'ob-ec-rel', 'ob-ec-phone'];
+      for (var i = 0; i < req.length; i++) {
+        var el = document.getElementById(req[i]);
+        if (!el || !el.value.trim()) { if (el) el.focus(); showToast('請填寫緊急聯絡人必填欄位', 'err'); return false; }
+      }
+      return true;
+    }
+    function submitOnboarding() {
+      if (!obVal2()) return;
+      var data = {
+        name: document.getElementById('ob-name').value,
+        dept: document.getElementById('ob-dept').value,
+        title: document.getElementById('ob-title').value,
+        joinDate: document.getElementById('ob-join').value,
+        phone: document.getElementById('ob-phone').value,
+        email: document.getElementById('ob-email').value,
+        emptype: document.getElementById('ob-etype').value,
+        location: document.getElementById('ob-loc').value,
+        manager: document.getElementById('ob-mgr').value,
+        ecName: document.getElementById('ob-ec-name').value,
+        ecRel: document.getElementById('ob-ec-rel').value,
+        ecPhone: document.getElementById('ob-ec-phone').value
+      };
+      pushNotion('onboarding', data);
+    }
+
+    // ── Check-in ──────────────────────────────────────────
+    function resetCheckin() {
+      ['c-name', 'c-clockin', 'c-clockout', 'c-note'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+      document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+    }
+    function submitCheckin() {
+      var name = document.getElementById('c-name').value;
+      var date = document.getElementById('c-date').value;
+      if (!name || !date) { showToast('請填寫姓名與日期', 'err'); return; }
+      var data = {
+        name: name,
+        date: date,
+        clockIn: document.getElementById('c-clockin').value,
+        clockOut: document.getElementById('c-clockout').value,
+        note: document.getElementById('c-note').value
+      };
+      pushNotion('checkin', data);
+    }
+
+    // ── Directory ──────────────────────────────────────────
+    function avStyle(idx) { var c = AVCOLS[idx % AVCOLS.length]; return 'background:' + c[0] + ';color:' + c[1]; }
+    function initials(n) { return n.slice(0, 2); }
+    function tenure(join) {
+      var d = new Date(join), now = new Date();
+      var y = now.getFullYear() - d.getFullYear(), m = now.getMonth() - d.getMonth();
+      if (m < 0) { y--; m += 12; }
+      return y > 0 ? y + '年' + (m > 0 ? m + '月' : '') : m + '月';
+    }
+    function stag(s) {
+      if (s === '在職') return '<span class="tag tgreen">' + s + '</span>';
+      if (s === '試用期') return '<span class="tag tyellow">' + s + '</span>';
+      return '<span class="tag tgray">' + s + '</span>';
+    }
+    function renderDir() {
+      var q = (document.getElementById('dir-q').value || '').toLowerCase();
+      var dept = document.getElementById('dir-dept').value;
+      var status = document.getElementById('dir-status').value;
+      var f = DIR_DATA.filter(function (e) {
+        return (!q || e.name.indexOf(q) > -1 || e.email.indexOf(q) > -1 || e.id.toLowerCase().indexOf(q) > -1)
+          && (!dept || e.dept === dept) && (!status || e.status === status);
+      });
+      document.getElementById('dir-body').innerHTML = f.length ? f.map(function (e) {
+        var idx = DIR_DATA.indexOf(e);
+        return '<tr onclick="showEmp(\'' + e.id + '\')" style="cursor:pointer">'
+          + '<td><div style="display:flex;align-items:center;gap:10px"><div class="av" style="' + avStyle(idx) + '">' + initials(e.name) + '</div>'
+          + '<div><div style="font-weight:500">' + e.name + '</div><div style="font-size:11px;color:var(--text3)">' + e.id + '</div></div></div></td>'
+          + '<td>' + e.dept + '</td><td>' + e.title + '</td>'
+          + '<td style="color:var(--accent)">' + e.email + '</td>'
+          + '<td>' + tenure(e.join) + '</td><td>' + stag(e.status) + '</td></tr>';
+      }).join('') : '<tr><td colspan="6" class="empty">尚無員工資料，入職報到後將自動顯示。</td></tr>';
+    }
+    function showEmp(id) {
+      var e = DIR_DATA.find(function (x) { return x.id === id; });
+      if (!e) return;
+      var idx = DIR_DATA.indexOf(e);
+      var d = document.getElementById('dir-detail');
+      d.style.display = 'block';
+      d.innerHTML = '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">'
+        + '<div class="av" style="' + avStyle(idx) + ';width:52px;height:52px;font-size:16px">' + initials(e.name) + '</div>'
+        + '<div style="flex:1"><div style="font-size:16px;font-weight:700">' + e.name + ' <span style="font-size:12px;font-weight:400;color:var(--text3)">' + e.id + '</span></div>'
+        + '<div style="font-size:13px;color:var(--text2)">' + e.dept + ' · ' + e.title + '</div></div>'
+        + stag(e.status)
+        + '<button class="btn btnsm" onclick="document.getElementById(\'dir-detail\').style.display=\'none\'">關閉</button></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:13px">'
+        + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">Email</div><div style="color:var(--accent)">' + e.email + '</div></div>'
+        + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">電話</div><div>' + (e.phone || '-') + '</div></div>'
+        + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">到職日</div><div>' + e.join + '（' + tenure(e.join) + '）</div></div>'
+        + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">直屬主管</div><div>' + (e.manager || '-') + '</div></div></div>';
+    }
+
+    // ── Tracker ────────────────────────────────────────────
+    function renderTracker() {
+      var q = (document.getElementById('trk-q').value || '').toLowerCase();
+      var dept = document.getElementById('trk-dept').value;
+      var status = document.getElementById('trk-status').value;
+      var type = document.getElementById('trk-type').value;
+      var f = RECORDS.filter(function (r) {
+        return (!q || r.name.indexOf(q) > -1 || r.id.toLowerCase().indexOf(q) > -1)
+          && (!dept || r.dept === dept)
+          && (!status || r.status.indexOf(status) > -1)
+          && (!type || r.type === type);
+      });
+      var pending = RECORDS.filter(function (r) { return r.status === '待審核'; }).length;
+      var approved = RECORDS.filter(function (r) { return r.status === '已核准'; }).length;
+      var rejected = RECORDS.filter(function (r) { return r.status === '已駁回'; }).length;
+      document.getElementById('trk-stats').innerHTML =
+        '<div class="stat"><div class="statn">' + RECORDS.length + '</div><div class="statl">全部申請</div></div>'
+        + '<div class="stat"><div class="statn" style="color:var(--warning)">' + pending + '</div><div class="statl">待審核</div></div>'
+        + '<div class="stat"><div class="statn" style="color:var(--success)">' + approved + '</div><div class="statl">已核准</div></div>'
+        + '<div class="stat"><div class="statn" style="color:var(--danger)">' + rejected + '</div><div class="statl">已駁回</div></div>';
+      document.getElementById('trk-list').innerHTML = f.length ? f.map(function (r) {
+        var labels = r.type === 'leave' ? ['提交', '主管審核', 'HR確認', '完成'] : ['提交', '主管審核', '財務確認', '完成'];
+        var tl = labels.map(function (lbl, i) {
+          var cls = 'tlstep', icon = '';
+          if (r.step === -1) { if (i < 2) { cls = 'tlstep done'; icon = '✓'; } else if (i === 2) { cls = 'tlstep rej'; icon = '✕'; } }
+          else { if (i < r.step) { cls = 'tlstep done'; icon = '✓'; } else if (i === r.step) { cls = 'tlstep cur'; icon = '…'; } }
+          return '<div class="' + cls + '"><div class="tldot">' + icon + '</div><div class="tllbl">' + lbl + '</div></div>';
+        }).join('');
+        var sc = r.status === '已核准' ? 'tgreen' : r.status === '已駁回' ? 'tred' : 'tyellow';
+        return '<div class="card" style="padding:16px 20px;margin-bottom:10px">'
+          + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'
+          + '<div><div style="font-size:14px;font-weight:600">' + r.name + ' <span style="font-size:11px;font-weight:400;color:var(--text3)">' + r.id + '</span></div>'
+          + '<div style="font-size:12px;color:var(--text3)">' + r.title + ' · ' + r.date + ' · ' + r.dept + '</div></div>'
+          + '<span class="tag ' + sc + '">' + r.status + '</span></div>'
+          + '<div class="tl">' + tl + '</div></div>';
+      }).join('') : '<div class="card"><div class="empty">尚無申請紀錄</div></div>';
+    }
+
+    // ── Notion ─────────────────────────────────────────────
+    function pushNotion(type, data) {
+      var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
+      if (!nToken || !dbId) {
+        showToast('請先設定 Notion Token 和 Database ID', 'err');
+        addAIMsg('bot', '請到左側「Notion 設定」頁面填入 Token 和 Database ID。');
+        return;
+      }
+      showToast('送出中...', '');
+      var props;
+      if (type === 'leave') props = buildLeaveProps(data);
+      else if (type === 'expense') props = buildExpenseProps(data);
+      else if (type === 'checkin') props = buildCheckinProps(data);
+      else props = buildOnboardingProps(data);
+      fetch(API_BASE + '/api/notion/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+        body: JSON.stringify({ parent: { database_id: dbId }, properties: props })
+      }).then(function (res) {
+        if (res.ok) {
+          var id = (type === 'leave' ? 'REQ' : type === 'expense' ? 'EXP' : 'EMP') + '-' + String(Date.now()).slice(-4);
+          if (type !== 'onboarding') {
+            RECORDS.unshift({
+              id: id, type: type, name: data.name, dept: data.dept || '',
+              title: type === 'leave' ? data.type + ' ' + data.days + ' 天' : type === 'checkin' ? data.date + ' 簽到' : '報帳 NT$' + data.total,
+              status: type === 'checkin' ? '已記錄' : '待審核', step: type === 'checkin' ? 4 : 1, date: new Date().toISOString().split('T')[0]
+            });
+          } else {
+            DIR_DATA.unshift({
+              id: id, name: data.name, dept: data.dept, title: data.title,
+              email: data.email, phone: data.phone, join: data.joinDate, status: '試用期', manager: data.manager
+            });
+            renderDir();
+          }
+          showToast('已成功同步至 Notion！', 'ok');
+          addAIMsg('bot', '✅ ' + data.name + ' 的申請已送出並同步至 Notion！編號 ' + id + '。');
+        } else {
+          res.json().then(function (err) { showToast('送出失敗：' + (err.message || '請確認設定'), 'err'); });
+        }
+      }).catch(function () { showToast('網路錯誤，請稍後重試', 'err'); });
+    }
+    function rt(v) { return [{ text: { content: v || '' } }]; }
+    function buildLeaveProps(d) {
+      var id = 'REQ-' + String(Date.now()).slice(-4);
+      return {
+        '申請編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
+        '假別': { select: { name: d.type } }, '開始日期': { date: { start: d.start } }, '結束日期': { date: { start: d.end } },
+        '請假天數': { number: parseFloat(d.days) || 0 }, '請假原因': { rich_text: rt(d.reason) }, '審核狀態': { select: { name: '待審核' } }
+      };
+    }
+    function buildExpenseProps(d) {
+      var id = 'EXP-' + String(Date.now()).slice(-4);
+      var items = d.items.map(function (i) { return i.desc + '（' + i.cat + '）NT$' + i.amount; }).join('、');
+      return {
+        '申請編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
+        '合計金額': { number: parseInt(d.total.replace(/,/g, '')) || 0 }, '費用明細': { rich_text: rt(items) },
+        '專案用途': { rich_text: rt(d.project) }, '帳號末5碼': { rich_text: rt(d.bank) }, '審核狀態': { select: { name: '待主管審核' } }
+      };
+    }
+    function buildOnboardingProps(d) {
+      var id = 'EMP-' + String(Date.now()).slice(-4);
+      return {
+        '員工編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
+        '職稱': { rich_text: rt(d.title) }, 'Email': { email: d.email }, '電話': { phone_number: d.phone },
+        '在職狀態': { select: { name: '試用期' } },
+        '備註': { rich_text: rt('緊急聯絡：' + d.ecName + '（' + d.ecRel + '）' + d.ecPhone + '｜' + d.emptype + '｜' + d.location) }
+      };
+    }
+    function buildCheckinProps(d) {
+      return {
+        '姓名': { title: rt(d.name) },
+        '日期': { date: { start: d.date } },
+        '上班時間': { rich_text: rt(d.clockIn) },
+        '下班時間': { rich_text: rt(d.clockOut) },
+        '備註': { rich_text: rt(d.note) }
+      };
+    }
+    function saveToken() {
+      nToken = document.getElementById('notion-token').value.trim();
+      localStorage.setItem('nToken', nToken);
+      updateNotionUI();
+      showToast('Token 已儲存', 'ok');
+    }
+    function saveDBs() {
+      nDBs = {
+        leave: document.getElementById('db-leave').value.trim(), expense: document.getElementById('db-expense').value.trim(),
+        employees: document.getElementById('db-employees').value.trim(), approvals: document.getElementById('db-approvals').value.trim(),
+        checkin: document.getElementById('db-checkin').value.trim()
+      };
+      localStorage.setItem('nDBs', JSON.stringify(nDBs));
+      updateNotionUI();
+      showToast('設定已儲存', 'ok');
+    }
+    function testNotion() {
+      if (!nToken) { showToast('請先輸入 Token', 'err'); return; }
+      showToast('測試中...', '');
+      fetch(API_BASE + '/api/notion/users/me', { headers: { 'x-notion-token': nToken } })
+        .then(function (r) {
+          if (r.ok) {
+            showToast('連線成功！', 'ok');
+            document.getElementById('ndot').className = 'ndot on';
+            document.getElementById('nlabel').textContent = '已連接 Notion';
+          } else {
+            r.json().then(function (err) {
+              showToast('連線失敗：' + (err.error || err.message || '請確認 Token'), 'err');
+            }).catch(function () {
+              showToast('連線失敗 (HTTP ' + r.status + ')', 'err');
+            });
+          }
+        })
+        .catch(function (e) { showToast('連線失敗：無法接觸伺服器', 'err'); console.error(e); });
+    }
+    function updateNotionUI() {
+      document.getElementById('ndot').className = nToken ? 'ndot on' : 'ndot';
+      document.getElementById('nlabel').textContent = nToken ? '已設定 Token' : '未連接 Notion';
+      document.getElementById('nstatus-detail').innerHTML = nToken
+        ? '<span style="color:var(--success)">✓ Token 已設定</span><br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
+        : '尚未設定 Notion Token。';
+      if (nToken) document.getElementById('notion-token').value = nToken;
+      ['leave', 'expense', 'employees', 'approvals', 'checkin'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
+    }
+    function toggleTok() {
+      var i = document.getElementById('notion-token'), b = document.querySelector('.trtoggle');
+      if (i.type === 'password') { i.type = 'text'; b.textContent = '隱藏'; } else { i.type = 'password'; b.textContent = '顯示'; }
+    }
+
+    // ── AI ─────────────────────────────────────────────────
+    function toggleAI() {
+      aiOpen = !aiOpen;
+      document.getElementById('aipanel').classList.toggle('open', aiOpen);
+      document.getElementById('ai-btn').style.display = aiOpen ? 'none' : '';
+    }
+    function addAIMsg(role, text) {
+      var m = document.getElementById('aimsgs');
+      var d = document.createElement('div'); d.className = 'aimsg ' + role; d.textContent = text;
+      m.appendChild(d); m.scrollTop = m.scrollHeight;
+      if (!aiOpen) toggleAI();
+    }
+    function sendAI() {
+      var inp = document.getElementById('ai-inp'), text = inp.value.trim();
+      if (!text) return; inp.value = ''; addAIMsg('user', text);
+      var loading = document.createElement('div'); loading.className = 'aimsg bot'; loading.textContent = '思考中...';
+      document.getElementById('aimsgs').appendChild(loading);
+      fetch(API_BASE + '/api/claude', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 1000,
+          system: '你是 HR 系統的 AI 助理，協助使用者操作系統（請假、報帳、入職、查詢、Notion 設定）。請用繁體中文簡潔回答，不超過 120 字。',
+          messages: [{ role: 'user', content: text }]
+        })
+      }).then(function (r) { return r.json(); })
+        .then(function (data) { loading.remove(); addAIMsg('bot', (data.content && data.content[0] && data.content[0].text) || '抱歉，暫時無法回應。'); })
+        .catch(function () { loading.remove(); addAIMsg('bot', '連線發生錯誤，請稍後再試。'); });
+    }
+
+    // ── Toast ───────────────────────────────────────────────
+    function showToast(msg, type) {
+      var t = document.getElementById('toast'); t.textContent = msg;
+      t.className = 'toast show ' + (type || '');
+      setTimeout(function () { t.className = 'toast'; }, 3000);
+    }
+
+    // ── Init ────────────────────────────────────────────────
+    // 檢查代理伺服器是否運行中
+    fetch(API_BASE + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
+      if (s.notion) {
+        // 伺服器端已有 token，自動設定客戶端旗標讓表單可以送出
+        if (!nToken) {
+          nToken = '__server__';
+          localStorage.setItem('nToken', nToken);
+        }
+        document.getElementById('ndot').className = 'ndot on';
+        document.getElementById('nlabel').textContent = '已連接 Notion';
+        document.getElementById('nstatus-detail').innerHTML = '<span style="color:var(--success)">✓ 伺服器 Token 已設定</span><br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定');
+      }
+    }).catch(function () { });
+    updateNotionUI();
+    renderDir();
+    renderTracker();
+    document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+  </script>
+</body>
+
+</html>

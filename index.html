@@ -1050,6 +1050,33 @@
       .acc-row { gap: 10px }
       .acc-pw { font-size: 13px }
     }
+  
+    /* --- CRM CSS --- */
+    .client-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+    .client-row:last-child{border-bottom:none}
+    .client-row:hover{background:var(--bg);margin:0 -24px;padding:12px 24px}
+    .client-info{flex:1;min-width:0}
+    .client-name{font-size:14px;font-weight:500}
+    .client-meta{font-size:12px;color:var(--text2);margin-top:2px}
+    .client-tags{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+    .upload-zone{border:2px dashed var(--border2);border-radius:var(--r);padding:20px 16px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:10px;background:var(--surface2)}
+    .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-bg)}
+    .upload-zone svg{width:28px;height:28px;color:var(--text3);margin-bottom:6px}
+    .upload-zone p{font-size:12px;color:var(--text2);margin:0}
+    .upload-zone p span{color:var(--accent);font-weight:500}
+    .thumb-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;min-height:0}
+    .thumb-item{position:relative}
+    .thumb-img{width:72px;height:72px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border);display:block}
+    .thumb-file{width:72px;height:72px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:var(--text2);text-align:center;padding:6px;gap:4px}
+    .thumb-del{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+    .ai-area{background:var(--accent-bg);border:1px solid #b8cef0;border-radius:var(--rl);padding:20px;margin-bottom:20px}
+    .ai-area .ct{color:var(--accent);margin-bottom:12px}
+    .ai-status{font-size:12px;color:var(--text2);margin-top:10px;min-height:18px}
+    .ai-status.thinking{color:var(--accent)}
+    .ai-status.done{color:var(--success)}
+    .ai-status.err{color:var(--danger)}
+    /* --- CRM CSS END --- */
+
   </style>
 </head>
 
@@ -1129,6 +1156,25 @@
           </svg>
           <span>審核追蹤</span>
         </div>
+        
+        <div class="nav-sec">客戶關係管理</div>
+        <div class="nav-item" onclick="navTo('crm-dashboard',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>客戶總覽</span>
+        </div>
+        <div class="nav-item" onclick="navTo('crm-add',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          <span>新增客戶</span>
+        </div>
+        <div class="nav-item" onclick="navTo('crm-update',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span>更新客戶</span>
+        </div>
+        <div class="nav-item" onclick="navTo('crm-callreport',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          <span>拜訪記錄</span>
+        </div>
+
         <div class="nav-sec">管理</div>
         <div class="nav-item" onclick="navTo('accounts',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1550,6 +1596,234 @@
           <div id="trk-list"></div>
         </div>
 
+        <!-- CRM 客戶總覽 -->
+<div class="page" id="page-crm-dashboard">
+
+        <div class="ph"><h2>客戶總覽</h2><p>所有客戶狀態一覽</p></div>
+        <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+          <div class="stat"><div class="statn" id="d-total">—</div><div class="statl">總客戶數</div></div>
+          <div class="stat"><div class="statn" id="d-hot">—</div><div class="statl">本週需跟進</div></div>
+          <div class="stat"><div class="statn" id="d-signed">—</div><div class="statl">已簽約</div></div>
+          <div class="stat"><div class="statn" id="d-amount">—</div><div class="statl">潛在金額(萬)</div></div>
+        </div>
+        <div class="card" style="padding:0 24px">
+          <div style="padding:16px 0 12px;display:flex;align-items:center;justify-content:space-between">
+            <span class="ct" style="margin:0">客戶列表</span>
+            <button class="btn btnsm" onclick="loadClients()">↻ 重新整理</button>
+          </div>
+          <div id="client-list"><div class="empty">載入中...</div></div>
+        </div>
+      </div>
+
+      <!-- CRM 新增客戶 -->
+<div class="page" id="page-crm-add">
+
+        <div class="ph"><h2>新增客戶</h2><p>貼上會議記錄或客戶資料，讓 AI 自動填寫</p></div>
+        <div class="ai-area">
+          <div class="ct">✦ AI 智慧填寫</div>
+          <div class="upload-zone" id="add-drop" onclick="document.getElementById('add-file-input').click()" ondragover="onDragOver(event,'add-drop')" ondragleave="onDragLeave('add-drop')" ondrop="onDrop(event,'add')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p><span>點擊上傳</span>或拖放圖片／截圖到這裡</p>
+            <p style="margin-top:4px;color:var(--text3);font-size:11px">支援 JPG、PNG、GIF、WebP、PDF</p>
+          </div>
+          <input type="file" id="add-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="addFiles('add',this)">
+          <div class="thumb-list" id="add-thumbs"></div>
+          <div class="fg" style="margin-bottom:10px">
+            <label>或貼上文字（可與圖片合併分析）</label>
+            <textarea id="add-ai-input" rows="3" placeholder="例：今天和德育護理學院的張主任見面，預算大概50萬..."></textarea>
+          </div>
+          <button class="btn btna btnsm" onclick="analyzeAdd()">✦ AI 分析並填入</button>
+          <div class="ai-status" id="add-ai-status"></div>
+        </div>
+        <div class="card">
+          <div class="ct">客戶基本資料</div>
+          <div class="grid2">
+            <div class="fg"><label>客戶名稱 *</label><input type="text" id="add-name" placeholder="公司或機構名稱"></div>
+            <div class="fg"><label>專案金額（NT$）</label><input type="number" id="add-amount" placeholder="0"></div>
+            <div class="fg">
+              <label>潛在客戶狀態</label>
+              <select id="add-status">
+                <option value="">請選擇</option>
+                <option>跟進中</option><option>有意願待簽約</option><option>報價中</option>
+                <option>已報價</option><option>快要簽約</option><option>MOU 待簽</option>
+                <option>已簽約</option><option>製作中</option><option>戰略夥伴</option><option>暫緩</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>優先級</label>
+              <select id="add-priority">
+                <option value="">請選擇</option>
+                <option>本週完成</option><option>本週推進</option><option>跟進中</option>
+                <option>持續維護</option><option>進行中</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>客戶反應</label>
+              <select id="add-reaction">
+                <option value="">請選擇</option>
+                <option>正面</option><option>猶豫</option><option>有疑慮</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>聯繫方式</label>
+              <select id="add-contact">
+                <option value="">請選擇</option>
+                <option>見面</option><option>電話</option><option>視訊</option>
+                <option>LINE</option><option>Email</option>
+              </select>
+            </div>
+            <div class="fg"><label>最近聯繫日期</label><input type="date" id="add-lastdate"></div>
+            <div class="fg"><label>下次跟進日期</label><input type="date" id="add-nextdate"></div>
+          </div>
+          <div class="grid1">
+            <div class="fg"><label>下一步行動</label><input type="text" id="add-action" placeholder="例：準備報價單、安排簡報..."></div>
+            <div class="fg"><label>承諾事項</label><input type="text" id="add-commitment" placeholder="例：下週五提供企劃書..."></div>
+            <div class="fg"><label>詳細現況備註</label><textarea id="add-notes" rows="3" placeholder="補充說明..."></textarea></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="btn btnp" onclick="submitAdd()">送出到 Notion</button>
+            <button class="btn" onclick="resetAdd()">清除</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CRM 更新客戶 -->
+<div class="page" id="page-crm-update">
+
+        <div class="ph"><h2>更新客戶</h2><p>選擇客戶後貼上最新資訊，AI 自動更新欄位</p></div>
+        <div class="card">
+          <div class="ct">選擇要更新的客戶</div>
+          <div class="fg" style="margin-bottom:0">
+            <select id="update-select" onchange="onSelectClient()">
+              <option value="">— 請選擇客戶 —</option>
+            </select>
+          </div>
+        </div>
+        <div id="update-form-area" style="display:none">
+          <div class="ai-area">
+            <div class="ct">✦ AI 智慧更新</div>
+            <div class="upload-zone" id="update-drop" onclick="document.getElementById('update-file-input').click()" ondragover="onDragOver(event,'update-drop')" ondragleave="onDragLeave('update-drop')" ondrop="onDrop(event,'update')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p><span>點擊上傳</span>或拖放圖片／截圖到這裡</p>
+              <p style="margin-top:4px;color:var(--text3);font-size:11px">支援 JPG、PNG、GIF、WebP、PDF</p>
+            </div>
+            <input type="file" id="update-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="addFiles('update',this)">
+            <div class="thumb-list" id="update-thumbs"></div>
+            <div class="fg" style="margin-bottom:10px">
+              <label>或貼上文字（可與圖片合併分析）</label>
+              <textarea id="update-ai-input" rows="3" placeholder="例：今天客戶回覆說預算縮減，希望改成分期付款..."></textarea>
+            </div>
+            <button class="btn btna btnsm" onclick="analyzeUpdate()">✦ AI 分析並更新</button>
+            <div class="ai-status" id="update-ai-status"></div>
+          </div>
+          <div class="card">
+            <div class="ct">欄位確認（AI 填入後可手動調整）</div>
+            <div class="grid2">
+              <div class="fg">
+                <label>潛在客戶狀態</label>
+                <select id="update-status">
+                  <option value="">請選擇</option>
+                  <option>跟進中</option><option>有意願待簽約</option><option>報價中</option>
+                  <option>已報價</option><option>快要簽約</option><option>MOU 待簽</option>
+                  <option>已簽約</option><option>製作中</option><option>戰略夥伴</option><option>暫緩</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>優先級</label>
+                <select id="update-priority">
+                  <option value="">請選擇</option>
+                  <option>本週完成</option><option>本週推進</option><option>跟進中</option>
+                  <option>持續維護</option><option>進行中</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>客戶反應</label>
+                <select id="update-reaction">
+                  <option value="">請選擇</option>
+                  <option>正面</option><option>猶豫</option><option>有疑慮</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>聯繫方式</label>
+                <select id="update-contact">
+                  <option value="">請選擇</option>
+                  <option>見面</option><option>電話</option><option>視訊</option>
+                  <option>LINE</option><option>Email</option>
+                </select>
+              </div>
+              <div class="fg"><label>最近聯繫日期</label><input type="date" id="update-lastdate"></div>
+              <div class="fg"><label>下次跟進日期</label><input type="date" id="update-nextdate"></div>
+              <div class="fg"><label>專案金額（NT$）</label><input type="number" id="update-amount"></div>
+            </div>
+            <div class="grid1">
+              <div class="fg"><label>下一步行動</label><input type="text" id="update-action"></div>
+              <div class="fg"><label>承諾事項</label><input type="text" id="update-commitment"></div>
+              <div class="fg"><label>詳細現況備註</label><textarea id="update-notes" rows="3"></textarea></div>
+            </div>
+            <button class="btn btnp" style="margin-top:4px" onclick="submitUpdate()">更新到 Notion</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CRM 拜訪記錄 -->
+      <div class="page" id="page-crm-callreport">
+        <div class="ph"><h2>新增拜訪記錄</h2><p>記錄每次與客戶的聯繫內容</p></div>
+        <div class="ai-area">
+          <div class="ct">✦ AI 智慧填寫</div>
+          <div class="upload-zone" id="call-drop" onclick="document.getElementById('call-file-input').click()" ondragover="onDragOver(event,'call-drop')" ondragleave="onDragLeave('call-drop')" ondrop="onDrop(event,'callreport')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p><span>點擊上傳</span>或拖放圖片／截圖到這裡</p>
+            <p style="margin-top:4px;color:var(--text3);font-size:11px">支援 JPG、PNG、GIF、WebP、PDF</p>
+          </div>
+          <input type="file" id="call-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="addFiles('callreport',this)">
+          <div class="thumb-list" id="callreport-thumbs"></div>
+          <div class="fg" style="margin-bottom:10px">
+            <label>或貼上文字（可與圖片合併分析）</label>
+            <textarea id="call-ai-input" rows="3" placeholder="例：2026/05/07 與王總見面討論..."></textarea>
+          </div>
+          <button class="btn btna btnsm" onclick="analyzeCall()">✦ AI 分析並填入</button>
+          <div class="ai-status" id="call-ai-status"></div>
+        </div>
+        <div class="card">
+          <div class="ct">拜訪詳情</div>
+          <div class="grid2">
+            <div class="fg">
+              <label>關聯客戶 *</label>
+              <select id="call-client">
+                <option value="">— 請選擇客戶 —</option>
+              </select>
+            </div>
+            <div class="fg"><label>拜訪日期 *</label><input type="date" id="call-date"></div>
+            <div class="fg">
+              <label>聯繫方式</label>
+              <select id="call-contact">
+                <option value="">請選擇</option>
+                <option>見面</option><option>電話</option><option>視訊</option>
+                <option>LINE</option><option>Email</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>客戶反應</label>
+              <select id="call-reaction">
+                <option value="">請選擇</option>
+                <option>正面</option><option>猶豫</option><option>有疑慮</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid1">
+            <div class="fg"><label>會議摘要 *</label><textarea id="call-summary" rows="4" placeholder="這次拜訪的重點..."></textarea></div>
+            <div class="fg"><label>承諾事項</label><input type="text" id="call-commitment" placeholder="對客戶的承諾..."></div>
+            <div class="fg"><label>下一步行動</label><input type="text" id="call-action" placeholder="下一步要做什麼..."></div>
+            <div class="fg"><label>下次跟進日期</label><input type="date" id="call-nextdate"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="btn btnp" onclick="submitCall()">送出到 Notion</button>
+            <button class="btn" onclick="resetCall()">清除</button>
+          </div>
+        </div>
+      </div>
+
+      
         <!-- Settings -->
         <!-- 帳號管理 -->
         <div class="page" id="page-accounts">
@@ -1617,6 +1891,8 @@
               <div class="fg"><label>審核記錄 Database ID</label><input type="text" id="db-approvals"></div>
               <div class="fg"><label>員工簽到 Database ID</label><input type="text" id="db-checkin"></div>
               <div class="fg"><label>帳號管理 Database ID</label><input type="text" id="db-accounts"></div>
+              <div class="fg"><label>CRM 客戶 Database ID</label><input type="text" id="db-crm"></div>
+              <div class="fg"><label>CRM 拜訪 Database ID</label><input type="text" id="db-call"></div>
             </div>
             <div style="margin-top:14px;display:flex;gap:10px">
               <button class="btn btnp" onclick="saveDBs()">儲存設定</button>
@@ -1682,6 +1958,10 @@
     // Cloudflare Worker：填入你的 Worker URL
     //   例如：'https://hr-proxy.你的名稱.workers.dev'
     var API_BASE = 'https://shy-sun-7610.seedmediatw.workers.dev';
+  // --- CRM Variables ---
+  var CRM_DATA = [];
+  var selectedClientId = '';
+
 
     // ── State ──────────────────────────────────────────────
     var nToken = localStorage.getItem('nToken') || '';
@@ -1691,14 +1971,20 @@
       employees: 'b1ba6f957a114a828da1b7018949114d',
       approvals: 'f3f9a9bcc4a9447fb9623723952e33b2',
       checkin: '2c99853a8c8c477aac90d188ad2362ce',
-      accounts: '4a4198896f524cf8be6beda5e6778483'
+      accounts: '4a4198896f524cf8be6beda5e6778483',
+      crm: '3568bb31aaa281bcb7b1f4550e01795c',
+      call: 'd68816abcca34320b8e3fcba1029299e'
     };
+    // 確保 CRM 相關 ID 存在 (遷移舊資料)
+    if (!nDBs.crm) nDBs.crm = localStorage.getItem('crm_crmdb') || '3568bb31aaa281bcb7b1f4550e01795c';
+    if (!nDBs.call) nDBs.call = localStorage.getItem('crm_calldb') || 'd68816abcca34320b8e3fcba1029299e';
+
     var RECORDS = [];
     var eiCount = 0;
     var aiOpen = false;
     var AVCOLS = [['#E6F1FB', '#0C447C'], ['#E1F5EE', '#085041'], ['#FAEEDA', '#633806'], ['#EEEDFE', '#3C3489'], ['#FAECE7', '#712B13'], ['#EAF3DE', '#27500A']];
     var CATS = ['交通費', '餐費', '住宿費', '材料費', '軟體訂閱', '培訓費', '其他'];
-    var PAGE_TITLES = { dashboard: '總覽', leave: '請假申請', expense: '報帳申請', onboarding: '員工入職報到', checkin: '員工簽到', directory: '員工查詢', tracker: '審核追蹤', accounts: '帳號管理', settings: 'Notion 設定' };
+    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', accounts:'帳號管理', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄' };
     var ACC_DATA = [];
 
     // ── Navigation ─────────────────────────────────────────
@@ -1718,6 +2004,8 @@
       if (el) el.classList.add('active');
       document.getElementById('topbar-title').textContent = PAGE_TITLES[id] || id;
       if (id === 'dashboard') loadDashboard();
+    if (id === 'crm-dashboard') loadClients();
+    if (id === 'crm-update' || id === 'crm-callreport') populateClientSelects();
       if (id === 'tracker') loadNotionData();
       if (id === 'accounts') loadAccounts();
       // 手機版：選完頁面後自動關閉選單
@@ -2268,7 +2556,9 @@
         leave: document.getElementById('db-leave').value.trim(), expense: document.getElementById('db-expense').value.trim(),
         employees: document.getElementById('db-employees').value.trim(), approvals: document.getElementById('db-approvals').value.trim(),
         checkin: document.getElementById('db-checkin').value.trim(),
-        accounts: document.getElementById('db-accounts').value.trim()
+        accounts: document.getElementById('db-accounts').value.trim(),
+        crm: document.getElementById('db-crm').value.trim(),
+        call: document.getElementById('db-call').value.trim()
       };
       localStorage.setItem('nDBs', JSON.stringify(nDBs));
       updateNotionUI();
@@ -2300,7 +2590,7 @@
         ? '<span style="color:var(--success)">✓ Token 已設定</span><br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
         : '尚未設定 Notion Token。';
       if (nToken) document.getElementById('notion-token').value = nToken;
-      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
+      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts', 'crm', 'call'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
     }
     function toggleTok() {
       var i = document.getElementById('notion-token'), b = document.querySelector('.trtoggle');
@@ -2425,7 +2715,390 @@
       setTimeout(function () { t.className = 'toast'; }, 3000);
     }
 
-    // ── Init ────────────────────────────────────────────────
+    // ── CRM Functions ──
+function loadClients() {
+    var el = document.getElementById('client-list');
+    el.innerHTML = '<div class="empty">載入中...</div>';
+    if (!nToken || !nDBs.crm) { 
+        el.innerHTML = '<div class="empty">請先到「Notion 設定」填入 Token 與 CRM 資料庫 ID 並儲存</div>'; 
+        return; 
+    }
+    var body = JSON.stringify({ page_size: 100, sorts: [{ property: '客戶名稱', direction: 'ascending' }] });
+    fetch(API_BASE + '/api/notion/databases/' + nDBs.crm + '/query', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken }, 
+        body: body 
+    })
+      .then(function(r){ 
+          if(!r.ok) throw new Error('API Error ' + r.status);
+          return r.json(); 
+      })
+      .then(function(data){
+        if (!data.results) { document.getElementById('client-list').innerHTML = '<div class="empty">讀取失敗，請確認設定</div>'; return; }
+        CRM_DATA = data.results.map(function(p){
+          var pr = p.properties;
+          return {
+            id: p.id,
+            name: gp(pr,'客戶名稱','title'),
+            status: gp(pr,'潛在客戶狀態','select'),
+            priority: gp(pr,'優先級','select'),
+            reaction: gp(pr,'客戶反應','select'),
+            contact: gp(pr,'聯繫方式','select'),
+            lastdate: gp(pr,'最近聯繫日期','date'),
+            nextdate: gp(pr,'下次跟進日期','date'),
+            action: gp(pr,'下一步行動','text'),
+            commitment: gp(pr,'承諾事項','text'),
+            notes: gp(pr,'詳細現況備註','text'),
+            amount: pr['專案金額'] && pr['專案金額'].number ? pr['專案金額'].number : 0
+          };
+        });
+        // Stats
+        document.getElementById('d-total').textContent = CRM_DATA.length;
+        document.getElementById('d-hot').textContent = CRM_DATA.filter(function(c){ return c.priority === '本週完成' || c.priority === '本週推進'; }).length;
+        document.getElementById('d-signed').textContent = CRM_DATA.filter(function(c){ return c.status === '已簽約' || c.status === '製作中'; }).length;
+        var total = CRM_DATA.reduce(function(s, c){ return s + (c.amount || 0); }, 0);
+        document.getElementById('d-amount').textContent = total ? (total / 10000).toFixed(1) : '—';
+        renderClients();
+      })
+      .catch(function(err){ 
+          document.getElementById('client-list').innerHTML = '<div class="empty">連線失敗：' + err.message + '<br><br>請確認 Notion Token 與資料庫 ID 是否正確，且已在 Notion 中將資料庫「Connect to」此整合。</div>'; 
+      });
+  }
+
+  function gp(props, key, type) {
+    var p = props[key]; if (!p) return '';
+    if (type === 'title') return p.title && p.title[0] ? p.title[0].plain_text : '';
+    if (type === 'text') return p.rich_text && p.rich_text[0] ? p.rich_text[0].plain_text : '';
+    if (type === 'select') return p.select ? p.select.name : '';
+    if (type === 'date') return p.date ? p.date.start : '';
+    return '';
+  }
+
+  var STATUS_COLOR = { '已簽約':'tgreen','製作中':'tgreen','快要簽約':'tyellow','有意願待簽約':'tyellow','MOU 待簽':'tyellow','報價中':'tblue','已報價':'tblue','跟進中':'tgray','暫緩':'tred','戰略夥伴':'tblue' };
+  var PRIORITY_COLOR = { '本週完成':'tred','本週推進':'tyellow','跟進中':'tgray','持續維護':'tgray','進行中':'tgreen' };
+
+  function renderClients() {
+    var el = document.getElementById('client-list');
+    if (!CRM_DATA.length) { el.innerHTML = '<div class="empty">沒有客戶資料</div>'; return; }
+    el.innerHTML = CRM_DATA.map(function(c){
+      var sc = STATUS_COLOR[c.status] || 'tgray';
+      var pc = PRIORITY_COLOR[c.priority] || 'tgray';
+      return '<div class="client-row" onclick="goUpdate(\'' + c.id + '\')">' +
+        '<div class="client-info">' +
+          '<div class="client-name">' + (c.name || '未命名') + '</div>' +
+          '<div class="client-meta">' + (c.action || '尚無下一步') + (c.nextdate ? ' · 跟進：' + c.nextdate : '') + '</div>' +
+        '</div>' +
+        '<div class="client-tags">' +
+          (c.status ? '<span class="tag ' + sc + '">' + c.status + '</span>' : '') +
+          (c.priority ? '<span class="tag ' + pc + '">' + c.priority + '</span>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function goUpdate(id) {
+    selectedClientId = id;
+    populateClientSelects();
+    var c = CRM_DATA.filter(function(x){ return x.id === id; })[0];
+    if (c) {
+      document.getElementById('update-select').value = id;
+      onSelectClient();
+    }
+    navTo('crm-update', null);
+  }
+
+  function populateClientSelects() {
+    ['update-select','call-client'].forEach(function(sid){
+      var sel = document.getElementById(sid);
+      var cur = sel.value;
+      sel.innerHTML = '<option value="">— 請選擇客戶 —</option>';
+      CRM_DATA.forEach(function(c){
+        var opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+      if (cur) sel.value = cur;
+    });
+  }
+
+  function onSelectClient() {
+    var id = document.getElementById('update-select').value;
+    var area = document.getElementById('update-form-area');
+    if (!id) { area.style.display = 'none'; return; }
+    area.style.display = '';
+    selectedClientId = id;
+    var c = CRM_DATA.filter(function(x){ return x.id === id; })[0];
+    if (!c) return;
+    setVal('update-status', c.status);
+    setVal('update-priority', c.priority);
+    setVal('update-reaction', c.reaction);
+    setVal('update-contact', c.contact);
+    document.getElementById('update-lastdate').value = c.lastdate || '';
+    document.getElementById('update-nextdate').value = c.nextdate || '';
+    document.getElementById('update-amount').value = c.amount || '';
+    document.getElementById('update-action').value = c.action || '';
+    document.getElementById('update-commitment').value = c.commitment || '';
+    document.getElementById('update-notes').value = c.notes || '';
+  }
+
+  function setVal(id, val) {
+    var el = document.getElementById(id);
+    if (el && val) el.value = val;
+  }
+
+  // ── 檔案上傳 ───────────────────────────────────────────────
+  var _files = { add: [], update: [], callreport: [] };
+
+  function addFiles(prefix, input) {
+    Array.from(input.files).forEach(function(f){ _files[prefix].push(f); });
+    renderThumbs(prefix);
+    input.value = '';
+  }
+
+  function removeFile(prefix, idx) {
+    _files[prefix].splice(idx, 1);
+    renderThumbs(prefix);
+  }
+
+  function renderThumbs(prefix) {
+    var el = document.getElementById(prefix + '-thumbs');
+    if (!el) return;
+    el.innerHTML = _files[prefix].map(function(f, i){
+      var isImg = f.type.startsWith('image/');
+      var src = isImg ? URL.createObjectURL(f) : '';
+      return '<div class="thumb-item">' +
+        (isImg
+          ? '<img class="thumb-img" src="' + src + '">'
+          : '<div class="thumb-file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + f.name.slice(0,10) + '</div>') +
+        '<button class="thumb-del" onclick="removeFile(\'' + prefix + '\',' + i + ')">✕</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function onDragOver(e, dropId) {
+    e.preventDefault();
+    document.getElementById(dropId).classList.add('drag');
+  }
+  function onDragLeave(dropId) {
+    document.getElementById(dropId).classList.remove('drag');
+  }
+  function onDrop(e, prefix) {
+    e.preventDefault();
+    var dropId = prefix === 'callreport' ? 'call-drop' : prefix + '-drop';
+    document.getElementById(dropId).classList.remove('drag');
+    var files = Array.from(e.dataTransfer.files).filter(function(f){
+      return f.type.startsWith('image/') || f.type === 'application/pdf';
+    });
+    files.forEach(function(f){ _files[prefix].push(f); });
+    renderThumbs(prefix);
+  }
+
+  function filesToParts(prefix) {
+    return Promise.all(_files[prefix].map(function(f){
+      return new Promise(function(resolve){
+        var reader = new FileReader();
+        reader.onload = function(e){
+          resolve({ inlineData: { mimeType: f.type, data: e.target.result.split(',')[1] } });
+        };
+        reader.readAsDataURL(f);
+      });
+    }));
+  }
+
+  // ── AI 分析 ────────────────────────────────────────────────
+  var AI_PROMPT = '你是一個 CRM 助理。從以下文字中提取客戶資訊，只回傳 JSON，不要其他文字。\n\n' +
+    'JSON 欄位：\n' +
+    '- clientName: 客戶/公司名稱（字串，若無則 null）\n' +
+    '- status: 潛在客戶狀態（只能是：戰略夥伴/已簽約/快要簽約/有意願待簽約/MOU 待簽/已報價/報價中/製作中/跟進中/暫緩，若無法判斷則 null）\n' +
+    '- priority: 優先級（只能是：本週完成/本週推進/跟進中/持續維護/進行中，若無法判斷則 null）\n' +
+    '- reaction: 客戶反應（只能是：正面/猶豫/有疑慮，若無法判斷則 null）\n' +
+    '- contactMethod: 聯繫方式（只能是：電話/視訊/見面/LINE/Email，若無法判斷則 null）\n' +
+    '- lastContactDate: 最近聯繫日期（YYYY-MM-DD，今天是 ' + new Date().toISOString().split('T')[0] + '，若無法判斷則 null）\n' +
+    '- nextFollowDate: 下次跟進日期（YYYY-MM-DD，若無法判斷則 null）\n' +
+    '- nextAction: 下一步行動（一句話，若無則 null）\n' +
+    '- commitment: 承諾事項（一句話，若無則 null）\n' +
+    '- notes: 詳細現況備註（若無則 null）\n' +
+    '- amount: 專案金額（純數字，若無則 null）\n' +
+    '- callSummary: 這次拜訪的摘要（50字以內，若不是拜訪記錄則 null）\n\n' +
+    '文字內容：\n';
+
+  function callAI(text, statusEl, prefix, callback) {
+    var hasFiles = _files[prefix] && _files[prefix].length > 0;
+    if (!text.trim() && !hasFiles) {
+      document.getElementById(statusEl).textContent = '請上傳圖片或輸入文字';
+      document.getElementById(statusEl).className = 'ai-status err';
+      return;
+    }
+    document.getElementById(statusEl).textContent = 'AI 分析中...';
+    document.getElementById(statusEl).className = 'ai-status thinking';
+
+    filesToParts(prefix).then(function(imgParts){
+      var parts = imgParts.concat([{ text: AI_PROMPT + (text.trim() || '（請從圖片中擷取所有客戶相關資訊）') }]);
+      return fetch(API_BASE + '/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gemini-2.0-flash', contents: [{ role: 'user', parts: parts }] })
+      });
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var raw = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
+      var json = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      try {
+        var result = JSON.parse(json);
+        document.getElementById(statusEl).textContent = '✓ 分析完成，請確認後送出';
+        document.getElementById(statusEl).className = 'ai-status done';
+        callback(result);
+      } catch(e) {
+        document.getElementById(statusEl).textContent = '解析失敗，請手動填寫';
+        document.getElementById(statusEl).className = 'ai-status err';
+      }
+    })
+    .catch(function(){
+      document.getElementById(statusEl).textContent = '連線失敗，請確認 Worker 設定';
+      document.getElementById(statusEl).className = 'ai-status err';
+    });
+  }
+
+  function fillForm(prefix, result) {
+    if (result.clientName && document.getElementById(prefix + '-name')) document.getElementById(prefix + '-name').value = result.clientName;
+    if (result.status) setVal(prefix + '-status', result.status);
+    if (result.priority) setVal(prefix + '-priority', result.priority);
+    if (result.reaction) setVal(prefix + '-reaction', result.reaction);
+    if (result.contactMethod) setVal(prefix + '-contact', result.contactMethod);
+    if (result.lastContactDate) document.getElementById(prefix + '-lastdate').value = result.lastContactDate;
+    if (result.nextFollowDate) document.getElementById(prefix + '-nextdate').value = result.nextFollowDate;
+    if (result.nextAction) document.getElementById(prefix + '-action').value = result.nextAction;
+    if (result.commitment) document.getElementById(prefix + '-commitment').value = result.commitment;
+    if (result.notes) document.getElementById(prefix + '-notes').value = result.notes;
+    if (result.amount) document.getElementById(prefix + '-amount') && (document.getElementById(prefix + '-amount').value = result.amount);
+    if (result.callSummary && document.getElementById('call-summary')) document.getElementById('call-summary').value = result.callSummary;
+  }
+
+  function analyzeAdd() { callAI(document.getElementById('add-ai-input').value, 'add-ai-status', 'add', function(r){ fillForm('add', r); }); }
+  function analyzeUpdate() { callAI(document.getElementById('update-ai-input').value, 'update-ai-status', 'update', function(r){ fillForm('update', r); }); }
+  function analyzeCall() { callAI(document.getElementById('call-ai-input').value, 'call-ai-status', 'callreport', function(r){ fillForm('call', r); }); }
+
+  // ── 送出到 Notion ──────────────────────────────────────────
+  function submitAdd() {
+    var name = document.getElementById('add-name').value.trim();
+    if (!name) { showToast('請填入客戶名稱', 'err'); return; }
+    var props = buildCRMProps('add', name);
+    showToast('送出中...', '');
+    fetch(API_BASE + '/api/notion/pages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+      body: JSON.stringify({ parent: { database_id: nDBs.crm }, properties: props })
+    })
+    .then(function(r){
+      if (r.ok) { showToast('客戶已新增到 Notion！', 'ok'); resetAdd(); loadClients(); }
+      else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
+    })
+    .catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+  }
+
+  function submitUpdate() {
+    if (!selectedClientId) { showToast('請先選擇客戶', 'err'); return; }
+    var props = buildCRMProps('update', null);
+    showToast('更新中...', '');
+    fetch(API_BASE + '/api/notion/pages/' + selectedClientId, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+      body: JSON.stringify({ properties: props })
+    })
+    .then(function(r){
+      if (r.ok) { showToast('客戶資料已更新！', 'ok'); loadClients(); }
+      else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
+    })
+    .catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+  }
+
+  function buildCRMProps(prefix, name) {
+    var props = {};
+    if (name) props['客戶名稱'] = { title: rt(name) };
+    var status = document.getElementById(prefix + '-status').value;
+    var priority = document.getElementById(prefix + '-priority').value;
+    var reaction = document.getElementById(prefix + '-reaction').value;
+    var contact = document.getElementById(prefix + '-contact').value;
+    var lastdate = document.getElementById(prefix + '-lastdate').value;
+    var nextdate = document.getElementById(prefix + '-nextdate').value;
+    var action = document.getElementById(prefix + '-action').value;
+    var commitment = document.getElementById(prefix + '-commitment').value;
+    var notes = document.getElementById(prefix + '-notes').value;
+    var amount = document.getElementById(prefix + '-amount') ? document.getElementById(prefix + '-amount').value : '';
+    if (status) props['潛在客戶狀態'] = { select: { name: status } };
+    if (priority) props['優先級'] = { select: { name: priority } };
+    if (reaction) props['客戶反應'] = { select: { name: reaction } };
+    if (contact) props['聯繫方式'] = { select: { name: contact } };
+    if (lastdate) props['最近聯繫日期'] = { date: { start: lastdate } };
+    if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
+    if (action) props['下一步行動'] = { rich_text: rt(action) };
+    if (commitment) props['承諾事項'] = { rich_text: rt(commitment) };
+    if (notes) props['詳細現況備註'] = { rich_text: rt(notes) };
+    if (amount) props['專案金額'] = { number: parseInt(amount) || 0 };
+    return props;
+  }
+
+  function submitCall() {
+    var clientId = document.getElementById('call-client').value;
+    var summary = document.getElementById('call-summary').value.trim();
+    var date = document.getElementById('call-date').value;
+    if (!clientId) { showToast('請選擇客戶', 'err'); return; }
+    if (!summary) { showToast('請填入會議摘要', 'err'); return; }
+    if (!date) { showToast('請選擇拜訪日期', 'err'); return; }
+    var clientName = CRM_DATA.filter(function(c){ return c.id === clientId; })[0];
+    var contact = document.getElementById('call-contact').value;
+    var reaction = document.getElementById('call-reaction').value;
+    var commitment = document.getElementById('call-commitment').value;
+    var action = document.getElementById('call-action').value;
+    var nextdate = document.getElementById('call-nextdate').value;
+    var props = {
+      '拜訪主旨': { title: rt((clientName ? clientName.name : '') + ' — ' + date) },
+      '拜訪日期': { date: { start: date } },
+      '會議摘要': { rich_text: rt(summary) }
+    };
+    if (contact) props['聯繫方式'] = { select: { name: contact } };
+    if (reaction) props['客戶反應'] = { select: { name: reaction } };
+    if (commitment) props['承諾事項'] = { rich_text: rt(commitment) };
+    if (action) props['下一步行動'] = { rich_text: rt(action) };
+    if (nextdate) props['下次跟進日期'] = { date: { start: nextdate } };
+    showToast('送出中...', '');
+    fetch(API_BASE + '/api/notion/pages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+      body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
+    })
+    .then(function(r){
+      if (r.ok) { showToast('拜訪記錄已新增！', 'ok'); resetCall(); }
+      else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
+    })
+    .catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+  }
+
+  // ── Reset ──────────────────────────────────────────────────
+  function resetAdd() {
+    ['add-name','add-amount','add-lastdate','add-nextdate','add-action','add-commitment','add-notes','add-ai-input'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['add-status','add-priority','add-reaction','add-contact'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('add-ai-status').textContent = '';
+    _files.add = []; renderThumbs('add');
+  }
+
+  function resetCall() {
+    ['call-summary','call-commitment','call-action','call-nextdate','call-ai-input'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['call-client','call-contact','call-reaction'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('call-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('call-ai-status').textContent = '';
+    _files.callreport = []; renderThumbs('callreport');
+  }
+
+  // ── 設定 ───────────────────────────────────────────────────
+  
+  // ── Init ────────────────────────────────────────────────
     // 檢查代理伺服器是否運行中
     fetch(API_BASE + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
       if (s.notion) {
