@@ -1916,17 +1916,10 @@
               <label>Integration Token</label>
               <div class="trwrap">
                 <input type="password" id="notion-token" placeholder="ntn_xxxxxxxxxxxx">
-                <span class="trtoggle" onclick="toggleTok('notion-token')">顯示</span>
+                <span class="trtoggle" onclick="toggleTok()">顯示</span>
               </div>
             </div>
-            <div class="fg" style="margin-bottom:12px">
-              <label>Gemini API Key (AI 辨識用)</label>
-              <div class="trwrap">
-                <input type="password" id="gemini-key" placeholder="AIzaSy...">
-                <span class="trtoggle" onclick="toggleTok('gemini-key')">顯示</span>
-              </div>
-            </div>
-            <button class="btn btnp" onclick="saveKeys()">儲存金鑰</button>
+            <button class="btn btnp" onclick="saveToken()">儲存 Token</button>
           </div>
           <div class="card">
             <div class="ct">資料庫 ID（已預設）</div>
@@ -2098,8 +2091,17 @@
 
 
     // ── State ──────────────────────────────────────────────
+    var nToken = localStorage.getItem('nToken') || '';
+    var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {
+      leave: '6846115f39e341a69c8c771f5e229c7c',
+      expense: '2f1e0e588b6a47c1b89d1392eca5272f',
+      employees: 'b1ba6f957a114a828da1b7018949114d',
+      approvals: 'f3f9a9bcc4a9447fb9623723952e33b2',
+      checkin: '2c99853a8c8c477aac90d188ad2362ce',
+      accounts: '4a4198896f524cf8be6beda5e6778483',
+      crm: '3568bb31aaa281bcb7b1f4550e01795c',
+      call: 'd68816abcca34320b8e3fcba1029299e'
     };
-    var gKey = localStorage.getItem('gKey') || '';
     // 確保 CRM 相關 ID 存在 (遷移舊資料)
     if (!nDBs.crm) nDBs.crm = localStorage.getItem('crm_crmdb') || '3568bb31aaa281bcb7b1f4550e01795c';
     if (!nDBs.call) nDBs.call = localStorage.getItem('crm_calldb') || 'd68816abcca34320b8e3fcba1029299e';
@@ -2313,7 +2315,7 @@
     function aiScanInvoices() {
       var statusEl = document.getElementById('ai-scan-status');
       if (!_invoiceFiles.length) return;
-
+      
       statusEl.style.color = 'var(--accent)';
       statusEl.textContent = 'AI 辨識中（' + _invoiceFiles.length + ' 張）...';
       document.getElementById('ai-scan-btn').disabled = true;
@@ -2334,12 +2336,21 @@
         parts.push({ text: '請辨識這' + images.length + '張發票/收據。只回傳 JSON 陣列，不要其他文字，格式：[{"desc":"費用說明","cat":"交通費","date":"YYYY-MM-DD","amount":數字},...]。類別只能是：' + CATS.join('、') + '。' });
         return fetch(API_BASE + '/api/gemini', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-gemini-key': gKey },
-          body: JSON.stringify({ contents: [{ parts: parts }] })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gemini-2.0-flash', contents: [{ parts: parts }] })
         });
       })
-      .then(function(r) { return r.json(); })
+      .then(function(r) { 
+        if (!r.ok) {
+          return r.json().then(function(e){ throw new Error(e.error || e.message || 'HTTP ' + r.status); });
+        }
+        return r.json(); 
+      })
       .then(function(data) {
+        if (data.error) {
+          var msg = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
+          throw new Error(msg);
+        }
         var text = data.candidates && data.candidates[0] ? data.candidates[0].content.parts[0].text : '';
         var json = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         var items = JSON.parse(json);
@@ -2358,7 +2369,7 @@
       })
       .catch(function(e) {
         statusEl.style.color = 'var(--danger)';
-        statusEl.textContent = '✕ 辨識失敗：' + (e.message || '請確認 Gemini API Key 是否正確');
+        statusEl.textContent = '✕ 辨識失敗：' + e.message;
         document.getElementById('ai-scan-btn').disabled = false;
       });
     }
@@ -2666,13 +2677,11 @@
         '備註': { rich_text: rt(d.note) }
       };
     }
-    function saveKeys() {
+    function saveToken() {
       nToken = document.getElementById('notion-token').value.trim();
-      gKey = document.getElementById('gemini-key').value.trim();
       localStorage.setItem('nToken', nToken);
-      localStorage.setItem('gKey', gKey);
       updateNotionUI();
-      showToast('金鑰已儲存', 'ok');
+      showToast('Token 已儲存', 'ok');
     }
     function saveDBs() {
       nDBs = {
@@ -2710,14 +2719,13 @@
       document.getElementById('ndot').className = nToken ? 'ndot on' : 'ndot';
       document.getElementById('nlabel').textContent = nToken ? '已設定 Token' : '未連接 Notion';
       document.getElementById('nstatus-detail').innerHTML = nToken
-        ? '<span style="color:var(--success)">✓ Token 已設定</span><br>' + (gKey ? '<span style="color:var(--success)">✓ Gemini Key 已設定</span>' : '<span style="color:var(--warning)">⚠ Gemini Key 未設定</span>') + '<br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
+        ? '<span style="color:var(--success)">✓ Token 已設定</span><br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
         : '尚未設定 Notion Token。';
       if (nToken) document.getElementById('notion-token').value = nToken;
-      if (gKey) document.getElementById('gemini-key').value = gKey;
       ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts', 'crm', 'call'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
     }
-    function toggleTok(id) {
-      var i = document.getElementById(id), b = event.target;
+    function toggleTok() {
+      var i = document.getElementById('notion-token'), b = document.querySelector('.trtoggle');
       if (i.type === 'password') { i.type = 'text'; b.textContent = '隱藏'; } else { i.type = 'password'; b.textContent = '顯示'; }
     }
 
@@ -3198,12 +3206,21 @@ function loadClients() {
       var parts = imgParts.concat([{ text: AI_PROMPT + (text.trim() || '（請從圖片中擷取所有客戶相關資訊）') }]);
       return fetch(API_BASE + '/api/gemini', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-key': gKey },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'gemini-2.0-flash', contents: [{ role: 'user', parts: parts }] })
       });
     })
-    .then(function(r){ return r.json(); })
+    .then(function(r){ 
+      if (!r.ok) {
+        return r.json().then(function(e){ throw new Error(e.error || e.message || 'HTTP ' + r.status); });
+      }
+      return r.json(); 
+    })
     .then(function(data){
+      if (data.error) {
+        var msg = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
+        throw new Error(msg);
+      }
       var raw = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
       var json = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
       try {
@@ -3216,8 +3233,8 @@ function loadClients() {
         document.getElementById(statusEl).className = 'ai-status err';
       }
     })
-    .catch(function(){
-      document.getElementById(statusEl).textContent = '連線失敗，請確認 Worker 設定';
+    .catch(function(err){
+      document.getElementById(statusEl).textContent = '分析失敗：' + err.message;
       document.getElementById(statusEl).className = 'ai-status err';
     });
   }
