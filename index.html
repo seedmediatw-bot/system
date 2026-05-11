@@ -2251,11 +2251,14 @@
       if (rows.length === 0) { showToast('請新增至少一筆費用', 'err'); return; }
       var items = Array.from(rows).map(function (r) {
         var inp = r.querySelectorAll('input'), sel = r.querySelector('select');
-        return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: inp[2].value };
+        return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: parseFloat(inp[2].value) || 0 };
       });
+      // 直接從數據計算總額，避免從 UI 抓取字串出錯
+      var totalSum = items.reduce(function(s, i){ return s + i.amount; }, 0);
+
       var data = {
         name: name, dept: dept,
-        total: document.getElementById('ei-total').textContent,
+        total: totalSum,
         items: items,
         empid: document.getElementById('e-empid').value,
         bank: document.getElementById('e-bank').value,
@@ -2264,7 +2267,13 @@
         note: document.getElementById('e-note').value
       };
       var photoFiles = _normalPhotoFiles.filter(function(f){ return f; });
-      if (!photoFiles.length) { pushNotion('expense', data); return; }
+      if (!photoFiles.length) { 
+          // 同步加入本地快取
+          LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: [] });
+          pushNotion('expense', data); 
+          setTimeout(loadExpenseHistory, 1500);
+          return; 
+      }
       showToast('上傳收據中（' + photoFiles.length + ' 張）...', '');
       Promise.all(photoFiles.map(function(file, i){
         return new Promise(function(resolve){
@@ -2308,6 +2317,10 @@
         }).then(function(r){ return r.json(); })
         .then(function(data){
             var notionResults = data.results || [];
+            
+            // 只要 Notion 有回傳任何資料，就視為同步成功，清空本地快取
+            if (notionResults.length > 0) { LOCAL_EXPENSE_CACHE = []; }
+            
             var html = '';
             
             // 1. 先顯示本地快取（確保即時性）
@@ -2330,10 +2343,11 @@
     function renderHistoryRow(name, amt, date, status, nid, localPhotos) {
         var sc = status === '已核准' ? 'tgreen' : status === '已駁回' ? 'tred' : (status === '送出中...' ? 'var(--text3)' : 'tyellow');
         var btnOnClick = nid ? 'viewReceipts(\'' + nid + '\')' : 'viewLocalPhotos(' + JSON.stringify(localPhotos) + ')';
+        var displayAmt = typeof amt === 'number' ? amt.toLocaleString() : amt;
         
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">' +
             '<div>' +
-                '<div style="font-size:13px;font-weight:600">' + (name || '—') + ' <span style="font-size:11px;color:var(--text3);font-weight:400">NT$ ' + amt + '</span></div>' +
+                '<div style="font-size:13px;font-weight:600">' + (name || '—') + ' <span style="font-size:11px;color:var(--text3);font-weight:400">NT$ ' + displayAmt + '</span></div>' +
                 '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + date + '</div>' +
             '</div>' +
             '<div style="display:flex;align-items:center;gap:8px">' +
@@ -2777,7 +2791,7 @@
       var items = d.items.map(function (i) { return i.desc + '（' + i.cat + '）NT$' + i.amount; }).join('、');
       return {
         '申請編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
-        '合計金額': { number: parseInt(String(d.total).replace(/[^0-9]/g, '')) || 0 }, '費用明細': { rich_text: rt(items) },
+        '合計金額': { number: Number(d.total) || 0 }, '費用明細': { rich_text: rt(items) },
         '專案用途': { rich_text: rt(d.project) }, '帳號末5碼': { rich_text: rt(d.bank) },
         '員工編號': { rich_text: rt(d.empid || '') },
         '備註': { rich_text: rt([d.note, d.receipt ? '收據連結：' + d.receipt : ''].filter(Boolean).join('\n')) },
