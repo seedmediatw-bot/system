@@ -2255,7 +2255,9 @@
       btn.textContent = '處理中...';
       var items = Array.from(rows).map(function (r) {
         var inp = r.querySelectorAll('input'), sel = r.querySelector('select');
-        return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: parseFloat(inp[2].value) || 0 };
+        // 先去掉逗號再轉數字
+        var rawAmt = inp[2].value.replace(/,/g, '');
+        return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: parseFloat(rawAmt) || 0 };
       });
       // 直接從數據計算總額，避免從 UI 抓取字串出錯
       var totalSum = items.reduce(function(s, i){ return s + i.amount; }, 0);
@@ -2351,7 +2353,21 @@
 
     function renderHistoryRow(name, amt, date, status, nid, localPhotos) {
         var sc = status === '已核准' ? 'tgreen' : status === '已駁回' ? 'tred' : (status === '送出中...' ? 'var(--text3)' : 'tyellow');
-        var btnOnClick = nid ? 'viewReceipts(\'' + nid + '\')' : 'viewLocalPhotos(' + JSON.stringify(localPhotos) + ')';
+        
+        var btnAttr = '';
+        if (nid) {
+            btnAttr = 'onclick="viewReceipts(\'' + nid + '\')"';
+        } else {
+            // 在 LOCAL_EXPENSE_CACHE 中尋找當前項目的索引
+            var cIdx = -1;
+            for(var i=0; i<LOCAL_EXPENSE_CACHE.length; i++) {
+                if(LOCAL_EXPENSE_CACHE[i].name === name && LOCAL_EXPENSE_CACHE[i].amount === amt) {
+                    cIdx = i; break;
+                }
+            }
+            btnAttr = 'onclick="viewCachePhotos(' + cIdx + ')"';
+        }
+
         var displayAmt = typeof amt === 'number' ? amt.toLocaleString() : amt;
         
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">' +
@@ -2361,13 +2377,15 @@
             '</div>' +
             '<div style="display:flex;align-items:center;gap:8px">' +
                 '<span class="tag ' + sc + '" style="font-size:10px;padding:2px 6px">' + status + '</span>' +
-                '<button class="btn btnsm" onclick=\'' + btnOnClick + '\' style="padding:0;width:32px;height:32px;justify-content:center;font-size:16px">🖼️</button>' +
+                '<button class="btn btnsm" ' + btnAttr + ' style="padding:0;width:32px;height:32px;justify-content:center;font-size:16px">🖼️</button>' +
             '</div>' +
         '</div>';
     }
 
-    function viewLocalPhotos(urls) {
-        if (!urls || !urls.length) { showToast('無圖片預覽', ''); return; }
+    function viewCachePhotos(idx) {
+        if (idx === -1 || !LOCAL_EXPENSE_CACHE[idx]) { showToast('找不到暫存圖片', 'err'); return; }
+        var urls = LOCAL_EXPENSE_CACHE[idx].localPhotos;
+        if (!urls || !urls.length) { showToast('此筆紀錄無圖片', ''); return; }
         var modal = document.getElementById('modal-receipts');
         var list = document.getElementById('receipts-list');
         list.innerHTML = urls.map(function(u){
