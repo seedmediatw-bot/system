@@ -8,7 +8,7 @@
   <style>
     #login-overlay {
       position: fixed;
-      inset: 0;
+      top: 0; left: 0; width: 100%; height: 100%;
       background: #1a1916;
       display: flex;
       align-items: center;
@@ -2273,14 +2273,15 @@
         note: document.getElementById('e-note').value
       };
       var photoFiles = _normalPhotoFiles.filter(function(f){ return f; });
-      if (!photoFiles.length) { 
-          // 同步加入本地快取
+      if (!photoFiles.length) {
           LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: [] });
-          pushNotion('expense', data); 
+          pushNotion('expense', data);
           resetExpense();
-          btn.disabled = false; btn.textContent = '送出申請';
-          setTimeout(loadExpenseHistory, 2000);
-          return; 
+          setTimeout(function(){
+            btn.disabled = false; btn.textContent = '送出申請';
+            loadExpenseHistory();
+          }, 2500);
+          return;
       }
       showToast('上傳收據中（' + photoFiles.length + ' 張）...', '');
       Promise.all(photoFiles.map(function(file, i){
@@ -2297,20 +2298,21 @@
           reader.readAsDataURL(file);
         });
       })).then(function(ids){
-        console.log('Sending to Notion with IDs:', ids);
-        // 存入本地快取
         LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: _normalPhotos.filter(function(u){ return u; }) });
         pushNotion('expense', data, ids.filter(function(id){ return id; }));
-        resetExpense(); // 送出後重設表單
-        btn.disabled = false; btn.textContent = '送出申請';
-        setTimeout(loadExpenseHistory, 2000); 
+        resetExpense();
+        setTimeout(function(){
+          btn.disabled = false; btn.textContent = '送出申請';
+          loadExpenseHistory();
+        }, 2500);
       }).catch(function(err){
-        console.error('Upload Error:', err);
         showToast('收據上傳失敗，仍嘗試送出...', 'err');
         pushNotion('expense', data);
         resetExpense();
-        btn.disabled = false; btn.textContent = '送出申請';
-        setTimeout(loadExpenseHistory, 2000);
+        setTimeout(function(){
+          btn.disabled = false; btn.textContent = '送出申請';
+          loadExpenseHistory();
+        }, 2500);
       });
     }
 
@@ -2501,6 +2503,9 @@
         statusEl.style.color = 'var(--danger)';
         statusEl.textContent = '✕ 辨識失敗：' + e.message;
         document.getElementById('ai-scan-btn').disabled = false;
+        _invoiceFiles = [];
+        document.getElementById('ai-scan-files').textContent = '尚未選擇圖片';
+        document.getElementById('ai-scan-btn').style.display = 'none';
       });
     }
     // ── Onboarding ─────────────────────────────────────────
@@ -2639,7 +2644,8 @@
       if (type === 'title') return p.title && p.title[0] ? p.title[0].plain_text : '';
       if (type === 'text') return p.rich_text && p.rich_text[0] ? p.rich_text[0].plain_text : '';
       if (type === 'select') return p.select ? p.select.name : '';
-      if (type === 'number') return p.number || 0;
+      if (type === 'number') return p.number != null ? p.number : 0;
+      if (type === 'date') return p.date ? p.date.start : '';
       return '';
     }
     function loadNotionData() {
@@ -2762,7 +2768,7 @@
         method: 'PATCH',
         headers: { 'Content-Type':'application/json', 'x-notion-token': nToken },
         body: JSON.stringify({ children: blocks })
-      });
+      }).catch(function(){ showToast('圖片附加失敗，但表單已送出', 'err'); });
     }
     function pushNotion(type, data, fileIds) {
       var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
@@ -3063,14 +3069,6 @@ function loadClients() {
       });
   }
 
-  function gp(props, key, type) {
-    var p = props[key]; if (!p) return '';
-    if (type === 'title') return p.title && p.title[0] ? p.title[0].plain_text : '';
-    if (type === 'text') return p.rich_text && p.rich_text[0] ? p.rich_text[0].plain_text : '';
-    if (type === 'select') return p.select ? p.select.name : '';
-    if (type === 'date') return p.date ? p.date.start : '';
-    return '';
-  }
 
   var STATUS_COLOR = { '已簽約':'tgreen','製作中':'tgreen','快要簽約':'tyellow','有意願待簽約':'tyellow','MOU 待簽':'tyellow','報價中':'tblue','已報價':'tblue','跟進中':'tgray','暫緩':'tred','戰略夥伴':'tblue' };
   var PRIORITY_COLOR = { '本週完成':'tred','本週推進':'tyellow','跟進中':'tgray','持續維護':'tgray','進行中':'tgreen' };
@@ -3190,6 +3188,49 @@ function loadClients() {
       if (r.ok) { showToast('主檔已更新', 'ok'); loadClients(); }
       else { showToast('更新失敗', 'err'); }
     });
+  }
+
+  function submitCall() {
+    var clientId = document.getElementById('call-client').value;
+    var summary = document.getElementById('call-summary').value.trim();
+    var date = document.getElementById('call-date').value;
+    if (!clientId) { showToast('請選擇客戶', 'err'); return; }
+    if (!summary) { showToast('請填入會議摘要', 'err'); return; }
+    if (!date) { showToast('請選擇拜訪日期', 'err'); return; }
+    var client = CRM_DATA.filter(function(c){ return c.id === clientId; })[0];
+    var contact = document.getElementById('call-contact').value;
+    var reaction = document.getElementById('call-reaction').value;
+    var commitment = document.getElementById('call-commitment').value;
+    var action = document.getElementById('call-action').value;
+    var nextdate = document.getElementById('call-nextdate').value;
+    var props = {
+      '拜訪主旨': { title: rt((client ? client.name : '') + ' — ' + date) },
+      '拜訪日期': { date: { start: date } },
+      '會議摘要': { rich_text: rt(summary) }
+    };
+    if (contact) props['聯繫方式'] = { select: { name: contact } };
+    if (reaction) props['客戶反應'] = { select: { name: reaction } };
+    if (commitment) props['承諾事項'] = { rich_text: rt(commitment) };
+    if (action) props['下一步行動'] = { rich_text: rt(action) };
+    if (nextdate) props['下次跟進日期'] = { date: { start: nextdate } };
+    showToast('送出中...', '');
+    fetch(API_BASE + '/api/notion/pages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+      body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
+    }).then(function(r){
+      if (r.ok) { showToast('拜訪記錄已新增！', 'ok'); resetCall(); }
+      else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
+    }).catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+  }
+
+  function resetCall() {
+    ['call-summary','call-commitment','call-action','call-nextdate'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['call-client','call-contact','call-reaction'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('call-date').value = new Date().toISOString().split('T')[0];
   }
 
   function submitCallFromModal() {
