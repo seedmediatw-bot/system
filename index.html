@@ -2244,11 +2244,15 @@
       document.getElementById('normal-photo-empty').style.display = '';
     }
     function submitExpense() {
+      var btn = document.querySelector('#page-expense .btnp');
       var name = document.getElementById('e-name').value;
       var dept = document.getElementById('e-dept').value;
       var rows = document.querySelectorAll('.eirow');
       if (!name || !dept) { showToast('請填寫申請人資訊', 'err'); return; }
       if (rows.length === 0) { showToast('請新增至少一筆費用', 'err'); return; }
+      
+      btn.disabled = true;
+      btn.textContent = '處理中...';
       var items = Array.from(rows).map(function (r) {
         var inp = r.querySelectorAll('input'), sel = r.querySelector('select');
         return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: parseFloat(inp[2].value) || 0 };
@@ -2271,7 +2275,9 @@
           // 同步加入本地快取
           LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: [] });
           pushNotion('expense', data); 
-          setTimeout(loadExpenseHistory, 1500);
+          resetExpense();
+          btn.disabled = false; btn.textContent = '送出申請';
+          setTimeout(loadExpenseHistory, 2000);
           return; 
       }
       showToast('上傳收據中（' + photoFiles.length + ' 張）...', '');
@@ -2289,26 +2295,29 @@
           reader.readAsDataURL(file);
         });
       })).then(function(ids){
-        // 存入本地快取，以便立即查看
-        LOCAL_EXPENSE_CACHE.unshift({
-            name: data.name,
-            amount: data.total,
-            date: new Date().toISOString().split('T')[0],
-            status: '送出中...',
-            localPhotos: _normalPhotos.filter(function(u){ return u; })
-        });
+        console.log('Sending to Notion with IDs:', ids);
+        // 存入本地快取
+        LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: _normalPhotos.filter(function(u){ return u; }) });
         pushNotion('expense', data, ids.filter(function(id){ return id; }));
-        setTimeout(loadExpenseHistory, 1500); 
-      }).catch(function(){
+        resetExpense(); // 送出後重設表單
+        btn.disabled = false; btn.textContent = '送出申請';
+        setTimeout(loadExpenseHistory, 2000); 
+      }).catch(function(err){
+        console.error('Upload Error:', err);
         showToast('收據上傳失敗，仍嘗試送出...', 'err');
         pushNotion('expense', data);
-        setTimeout(loadExpenseHistory, 1500);
+        resetExpense();
+        btn.disabled = false; btn.textContent = '送出申請';
+        setTimeout(loadExpenseHistory, 2000);
       });
     }
 
     function loadExpenseHistory() {
         var list = document.getElementById('expense-history-list');
         if (!list || !nToken || !nDBs.expense) return;
+        
+        // 只要開始載入正式資料，就清空快取，避免重複
+        LOCAL_EXPENSE_CACHE = [];
         
         fetch(API_BASE + '/api/notion/databases/' + nDBs.expense + '/query', {
             method: 'POST',
@@ -2753,6 +2762,9 @@
       else if (type === 'expense') props = buildExpenseProps(data);
       else if (type === 'checkin') props = buildCheckinProps(data);
       else props = buildOnboardingProps(data);
+      
+      console.log('Pushing to Notion:', { type: type, data: data, props: props });
+      
       fetch(API_BASE + '/api/notion/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
