@@ -2061,6 +2061,19 @@
     </div>
   </div>
 
+  <!-- 收據附件彈窗 -->
+  <div class="modal" id="modal-receipts">
+    <div class="modal-content" style="max-width:500px">
+      <div class="modal-hdr">
+        <h3>申請附件 / 收據</h3>
+        <button class="btn btnsm" onclick="closeReceipts()">關閉</button>
+      </div>
+      <div class="modal-body" id="receipts-list">
+        <!-- 圖片內容 -->
+      </div>
+    </div>
+  </div>
+
   <script>
     // ── 密碼驗證 ───────────────────────────────────────────────
     (function () {
@@ -2528,6 +2541,7 @@
           var status = gp(p, '審核狀態', 'select') || '待審核';
           var step = status === '已核准' ? 4 : status === '已駁回' ? -1 : 1;
           RECORDS.push({
+            nid: page.id,
             id: gp(p, '申請編號', 'title') || page.id.slice(0, 8),
             type: 'leave', name: gp(p, '姓名', 'text'), dept: gp(p, '部門', 'select'),
             title: gp(p, '假別', 'select') + ' ' + gp(p, '請假天數', 'number') + ' 天',
@@ -2540,6 +2554,7 @@
           var dispStatus = rawStatus === '已核准' ? '已核准' : rawStatus === '已駁回' ? '已駁回' : '待審核';
           var step = rawStatus === '已核准' ? 4 : rawStatus === '已駁回' ? -1 : rawStatus === '待財務確認' ? 2 : 1;
           RECORDS.push({
+            nid: page.id,
             id: gp(p, '申請編號', 'title') || page.id.slice(0, 8),
             type: 'expense', name: gp(p, '姓名', 'text'), dept: gp(p, '部門', 'select'),
             title: '報帳 NT$' + Number(gp(p, '合計金額', 'number')).toLocaleString(),
@@ -2585,9 +2600,40 @@
           + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'
           + '<div><div style="font-size:14px;font-weight:600">' + r.name + ' <span style="font-size:11px;font-weight:400;color:var(--text3)">' + r.id + '</span></div>'
           + '<div style="font-size:12px;color:var(--text3)">' + r.title + ' · ' + r.date + ' · ' + r.dept + '</div></div>'
-          + '<span class="tag ' + sc + '">' + r.status + '</span></div>'
+          + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
+          + '<span class="tag ' + sc + '">' + r.status + '</span>'
+          + (r.type === 'expense' ? '<button class="btn btnsm" onclick="viewReceipts(\'' + r.nid + '\')" style="padding:3px 8px;font-size:11px">📎 查看附件</button>' : '')
+          + '</div></div>'
           + '<div class="tl">' + tl + '</div></div>';
       }).join('') : '<div class="card"><div class="empty">尚無申請紀錄</div></div>';
+    }
+
+    // --- 查看收據邏輯 ---
+    function viewReceipts(nid) {
+        var modal = document.getElementById('modal-receipts');
+        var list = document.getElementById('receipts-list');
+        list.innerHTML = '<div class="empty">正在從 Notion 抓取附件...</div>';
+        modal.classList.add('open');
+        
+        fetch(API_BASE + '/api/notion/blocks/' + nid + '/children', {
+            headers: { 'x-notion-token': nToken }
+        }).then(function(r){ return r.json(); })
+        .then(function(data){
+            var imgs = (data.results || []).filter(function(b){ return b.type === 'image'; });
+            if (!imgs.length) {
+                list.innerHTML = '<div class="empty">此申請沒有附帶圖片</div>';
+                return;
+            }
+            list.innerHTML = imgs.map(function(b){
+                var url = b.image.type === 'file' ? b.image.file.url : b.image.external.url;
+                return '<div style="margin-bottom:16px"><img src="' + url + '" style="width:100%;border-radius:8px;border:1px solid var(--border);display:block"></div>';
+            }).join('');
+        }).catch(function(){
+            list.innerHTML = '<div class="empty" style="color:var(--danger)">無法讀取附件，請確認 Notion 連線</div>';
+        });
+    }
+    function closeReceipts() {
+        document.getElementById('modal-receipts').classList.remove('open');
     }
 
     // ── Notion ─────────────────────────────────────────────
