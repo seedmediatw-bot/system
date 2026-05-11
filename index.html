@@ -2255,11 +2255,11 @@
       btn.textContent = '處理中...';
       var items = Array.from(rows).map(function (r) {
         var inp = r.querySelectorAll('input'), sel = r.querySelector('select');
-        // 先去掉逗號再轉數字
-        var rawAmt = inp[2].value.replace(/,/g, '');
+        // 極致強化解析：過濾掉所有非數字和非小數點的字元
+        var rawAmt = inp[2].value.replace(/[^-0-9.]/g, '');
         return { desc: inp[0].value, cat: sel.value, date: inp[1].value, amount: parseFloat(rawAmt) || 0 };
       });
-      // 直接從數據計算總額，避免從 UI 抓取字串出錯
+      // 直接從數據計算總額
       var totalSum = items.reduce(function(s, i){ return s + i.amount; }, 0);
 
       var data = {
@@ -2317,9 +2317,6 @@
     function loadExpenseHistory() {
         var list = document.getElementById('expense-history-list');
         if (!list || !nToken || !nDBs.expense) return;
-        
-        // 只要開始載入正式資料，就清空快取，避免重複
-        LOCAL_EXPENSE_CACHE = [];
         
         fetch(API_BASE + '/api/notion/databases/' + nDBs.expense + '/query', {
             method: 'POST',
