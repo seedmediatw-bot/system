@@ -1,8 +1,7 @@
 # 忽略所有檔案
 *
 
-# 但排除 index.html
+# 排除重要上傳檔案
 !index.html
-
-# 排除 .gitignore 本身 (確保規則持續有效)
+!README.md
 !.gitignore
