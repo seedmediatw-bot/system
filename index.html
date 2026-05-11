@@ -2131,6 +2131,7 @@
     if (!nDBs.call) nDBs.call = localStorage.getItem('crm_calldb') || 'd68816abcca34320b8e3fcba1029299e';
 
     var RECORDS = [];
+    var LOCAL_EXPENSE_CACHE = []; // 本地暫存近期報帳紀錄（含圖片）
     var eiCount = 0;
     var aiOpen = false;
     var AVCOLS = [['#E6F1FB', '#0C447C'], ['#E1F5EE', '#085041'], ['#FAEEDA', '#633806'], ['#EEEDFE', '#3C3489'], ['#FAECE7', '#712B13'], ['#EAF3DE', '#27500A']];
@@ -2279,12 +2280,20 @@
           reader.readAsDataURL(file);
         });
       })).then(function(ids){
+        // 存入本地快取，以便立即查看
+        LOCAL_EXPENSE_CACHE.unshift({
+            name: data.name,
+            amount: data.total,
+            date: new Date().toISOString().split('T')[0],
+            status: '送出中...',
+            localPhotos: _normalPhotos.filter(function(u){ return u; })
+        });
         pushNotion('expense', data, ids.filter(function(id){ return id; }));
-        setTimeout(loadExpenseHistory, 2000); 
+        setTimeout(loadExpenseHistory, 1500); 
       }).catch(function(){
         showToast('收據上傳失敗，仍嘗試送出...', 'err');
         pushNotion('expense', data);
-        setTimeout(loadExpenseHistory, 2000);
+        setTimeout(loadExpenseHistory, 1500);
       });
     }
 
@@ -2298,29 +2307,50 @@
             body: JSON.stringify({ page_size: 10, sorts: [{ timestamp: 'created_time', direction: 'descending' }] })
         }).then(function(r){ return r.json(); })
         .then(function(data){
-            if (!data.results || data.results.length === 0) {
-                list.innerHTML = '<div class="empty">尚無報帳紀錄</div>';
-                return;
-            }
-            list.innerHTML = data.results.map(function(p){
+            var notionResults = data.results || [];
+            var html = '';
+            
+            // 1. 先顯示本地快取（確保即時性）
+            LOCAL_EXPENSE_CACHE.forEach(function(item){
+                html += renderHistoryRow(item.name, item.amount, item.date, item.status, null, item.localPhotos);
+            });
+
+            // 2. 顯示 Notion 資料
+            notionResults.forEach(function(p){
                 var pr = p.properties;
-                var name = gp(pr, '姓名', 'text');
-                var amount = gp(pr, '合計金額', 'number');
-                var date = p.created_time.split('T')[0];
                 var status = gp(pr, '審核狀態', 'select') || '待處理';
-                var sc = status === '已核准' ? 'tgreen' : status === '已駁回' ? 'tred' : 'tyellow';
-                return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">' +
-                    '<div>' +
-                        '<div style="font-size:13px;font-weight:600">' + (name || '—') + ' <span style="font-size:11px;color:var(--text3);font-weight:400">NT$ ' + (amount||0).toLocaleString() + '</span></div>' +
-                        '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + date + '</div>' +
-                    '</div>' +
-                    '<div style="display:flex;align-items:center;gap:8px">' +
-                        '<span class="tag ' + sc + '" style="font-size:10px;padding:2px 6px">' + status + '</span>' +
-                        '<button class="btn btnsm" onclick="viewReceipts(\'' + p.id + '\')" style="padding:0;width:32px;height:32px;justify-content:center;font-size:16px">🖼️</button>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
+                var amount = gp(pr, '合計金額', 'number') || 0;
+                html += renderHistoryRow(gp(pr, '姓名', 'text'), amount.toLocaleString(), p.created_time.split('T')[0], status, p.id);
+            });
+
+            list.innerHTML = html || '<div class="empty">尚無報帳紀錄</div>';
         }).catch(function(){ list.innerHTML = '<div class="empty">載入歷史失敗</div>'; });
+    }
+
+    function renderHistoryRow(name, amt, date, status, nid, localPhotos) {
+        var sc = status === '已核准' ? 'tgreen' : status === '已駁回' ? 'tred' : (status === '送出中...' ? 'var(--text3)' : 'tyellow');
+        var btnOnClick = nid ? 'viewReceipts(\'' + nid + '\')' : 'viewLocalPhotos(' + JSON.stringify(localPhotos) + ')';
+        
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">' +
+            '<div>' +
+                '<div style="font-size:13px;font-weight:600">' + (name || '—') + ' <span style="font-size:11px;color:var(--text3);font-weight:400">NT$ ' + amt + '</span></div>' +
+                '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + date + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+                '<span class="tag ' + sc + '" style="font-size:10px;padding:2px 6px">' + status + '</span>' +
+                '<button class="btn btnsm" onclick=\'' + btnOnClick + '\' style="padding:0;width:32px;height:32px;justify-content:center;font-size:16px">🖼️</button>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function viewLocalPhotos(urls) {
+        if (!urls || !urls.length) { showToast('無圖片預覽', ''); return; }
+        var modal = document.getElementById('modal-receipts');
+        var list = document.getElementById('receipts-list');
+        list.innerHTML = urls.map(function(u){
+            return '<div style="margin-bottom:16px"><img src="' + u + '" style="width:100%;border-radius:8px;border:1px solid var(--border);display:block"></div>';
+        }).join('');
+        modal.classList.add('open');
     }
 
     // ── AI 發票辨識 ────────────────────────────────────────
@@ -2747,7 +2777,7 @@
       var items = d.items.map(function (i) { return i.desc + '（' + i.cat + '）NT$' + i.amount; }).join('、');
       return {
         '申請編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
-        '合計金額': { number: parseInt(d.total.replace(/,/g, '')) || 0 }, '費用明細': { rich_text: rt(items) },
+        '合計金額': { number: parseInt(String(d.total).replace(/[^0-9]/g, '')) || 0 }, '費用明細': { rich_text: rt(items) },
         '專案用途': { rich_text: rt(d.project) }, '帳號末5碼': { rich_text: rt(d.bank) },
         '員工編號': { rich_text: rt(d.empid || '') },
         '備註': { rich_text: rt([d.note, d.receipt ? '收據連結：' + d.receipt : ''].filter(Boolean).join('\n')) },
