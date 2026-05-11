@@ -1456,6 +1456,17 @@
             <button class="btn" onclick="resetExpense()">清除</button>
             <button class="btn btnp" onclick="submitExpense()">送出申請</button>
           </div>
+          
+          <!-- 報帳歷史紀錄區塊 -->
+          <div class="ph" style="margin-top:32px">
+            <h3>近期報帳紀錄</h3>
+            <p>查看您最近提交的項目與附件</p>
+          </div>
+          <div class="card" style="padding:0 20px">
+            <div id="expense-history-list">
+              <div class="empty">正在載入歷史紀錄...</div>
+            </div>
+          </div>
         </div>
 
         <!-- Onboarding -->
@@ -2147,6 +2158,7 @@
     if (id === 'crm-dashboard') loadClients();
     if (id === 'crm-update' || id === 'crm-callreport') populateClientSelects();
       if (id === 'tracker') loadNotionData();
+      if (id === 'expense') loadExpenseHistory();
       if (id === 'accounts') loadAccounts();
       // 手機版：選完頁面後自動關閉選單
       if (window.innerWidth <= 768) closeSidebar();
@@ -2268,10 +2280,47 @@
         });
       })).then(function(ids){
         pushNotion('expense', data, ids.filter(function(id){ return id; }));
+        setTimeout(loadExpenseHistory, 2000); 
       }).catch(function(){
         showToast('收據上傳失敗，仍嘗試送出...', 'err');
         pushNotion('expense', data);
+        setTimeout(loadExpenseHistory, 2000);
       });
+    }
+
+    function loadExpenseHistory() {
+        var list = document.getElementById('expense-history-list');
+        if (!list || !nToken || !nDBs.expense) return;
+        
+        fetch(API_BASE + '/api/notion/databases/' + nDBs.expense + '/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+            body: JSON.stringify({ page_size: 10, sorts: [{ timestamp: 'created_time', direction: 'descending' }] })
+        }).then(function(r){ return r.json(); })
+        .then(function(data){
+            if (!data.results || data.results.length === 0) {
+                list.innerHTML = '<div class="empty">尚無報帳紀錄</div>';
+                return;
+            }
+            list.innerHTML = data.results.map(function(p){
+                var pr = p.properties;
+                var name = gp(pr, '姓名', 'text');
+                var amount = gp(pr, '合計金額', 'number');
+                var date = p.created_time.split('T')[0];
+                var status = gp(pr, '審核狀態', 'select') || '待處理';
+                var sc = status === '已核准' ? 'tgreen' : status === '已駁回' ? 'tred' : 'tyellow';
+                return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">' +
+                    '<div>' +
+                        '<div style="font-size:13px;font-weight:600">' + (name || '—') + ' <span style="font-size:11px;color:var(--text3);font-weight:400">NT$ ' + (amount||0).toLocaleString() + '</span></div>' +
+                        '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + date + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;align-items:center;gap:8px">' +
+                        '<span class="tag ' + sc + '" style="font-size:10px;padding:2px 6px">' + status + '</span>' +
+                        '<button class="btn btnsm" onclick="viewReceipts(\'' + p.id + '\')" style="padding:0;width:32px;height:32px;justify-content:center;font-size:16px">🖼️</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }).catch(function(){ list.innerHTML = '<div class="empty">載入歷史失敗</div>'; });
     }
 
     // ── AI 發票辨識 ────────────────────────────────────────
