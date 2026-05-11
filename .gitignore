@@ -1,13 +1,8 @@
-.env
-node_modules/
-package.json
-package-lock.json
-server.js
-cloudflare-worker.js
-start.bat
-start-silent.vbs
-setup-startup.bat
-設定開機自動啟動.bat
-.claude/
-README.md
-crm.html
+# 忽略所有檔案
+*
+
+# 但排除 index.html
+!index.html
+
+# 排除 .gitignore 本身 (確保規則持續有效)
+!.gitignore
