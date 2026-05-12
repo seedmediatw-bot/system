@@ -1,6 +1,6 @@
 # HR & CRM 整合自動化系統
 
-公司內部 HR 與 CRM 雙核心系統，支援請假申請、報帳申請（含收據拍照上傳）、員工入職、員工簽到，以及 **AI 驅動的客戶關係管理 (CRM)**。資料即時同步至 Notion，無需後端伺服器即可上線。
+公司內部 HR 與 CRM 雙核心系統，支援請假申請、報帳申請（含收據拍照上傳）、員工入職、員工簽到、主管審核，以及 **AI 驅動的客戶關係管理 (CRM)**。資料即時同步至 Notion，無需後端伺服器即可上線。
 
 ---
 
@@ -27,7 +27,7 @@ GitHub Pages（index.html，靜態網頁）
     ↓
 Cloudflare Worker（API 代理，隱藏 API 金鑰）
     │
-    ├─→ Notion API（儲存 HR & CRM 資料、圖片）
+    ├─→ Notion API（儲存 HR & CRM 資料）
     └─→ Gemini API（AI 發票辨識、AI 助理、CRM 智慧分析）
 ```
 
@@ -53,10 +53,9 @@ Cloudflare Worker（API 代理，隱藏 API 金鑰）
 | 資料庫 | 說明 |
 |---|---|
 | 請假申請 | 員工請假記錄 |
-| 報帳申請 | 費用報帳，含收據圖片 |
+| 報帳申請 | 費用報帳，含收據圖片欄位 |
 | 員工資料庫 | 入職資料 |
 | 員工簽到記錄 | 每日簽到 |
-| 審核記錄 | 主管審核結果 |
 
 ### CRM 相關資料庫
 
@@ -78,7 +77,7 @@ Cloudflare Worker（API 代理，隱藏 API 金鑰）
 - 新增多筆費用明細，自動計算合計
 - **一般模式**：即時拍照或從相簿選取收據，縮圖預覽後一起送出
 - **AI 辨識模式**：拍照後 Gemini 自動辨識金額、日期、費用類別並填入表單
-- 收據圖片上傳後直接附加在 Notion 頁面內（可直接開啟查看）
+- Notion 報帳資料庫設有「收據圖片」欄位，可手動附加或待自動上傳功能完成後自動填入
 
 **員工入職**
 - 填寫基本資料、緊急聯絡人，自動建立員工頁面
@@ -89,6 +88,11 @@ Cloudflare Worker（API 代理，隱藏 API 金鑰）
 **儀表板**
 - 即時顯示本月請假數、待審報帳、在職員工數、本週簽到數
 
+**審核追蹤**
+- 列出所有請假與報帳申請，顯示審核進度時間軸
+- 主管可直接點擊「✓ 核准」或「✗ 駁回」，即時更新 Notion 審核狀態
+- 可依部門、狀態、類型篩選
+
 ### CRM 模組
 
 **客戶總覽**
@@ -98,10 +102,9 @@ Cloudflare Worker（API 代理，隱藏 API 金鑰）
 **新增 / 更新客戶**
 - **圖片上傳 + AI 分析**：上傳名片、LINE 截圖、會議記錄照片，Gemini 自動擷取客戶名稱、金額、狀態、下一步行動等欄位
 - 支援文字貼上與圖片同時分析
-- 可拖放圖片或點擊上傳，支援手機拍照
 
 **拜訪記錄**
-- 同樣支援圖片上傳 AI 分析
+- 支援圖片上傳 AI 分析
 - 新增記錄後自動回填至客戶主檔
 
 **AI 助理**
@@ -151,8 +154,9 @@ git clone https://github.com/seedmediatw-bot/CRM-HR.git
 #### 4. 設定 Notion Integration
 
 1. 前往 [notion.so/my-integrations](https://www.notion.so/my-integrations) 建立 Integration
-2. 複製 Token，填入 Cloudflare Worker 環境變數
-3. 在每個 Notion 資料庫頁面點 `...` → `Connect to` → 選擇你的 Integration
+2. Capabilities 確認勾選：Read content、Update content、Insert content
+3. 複製 Token，填入 Cloudflare Worker 環境變數
+4. 在每個 Notion 資料庫頁面點 `...` → `Connect to` → 選擇你的 Integration
 
 #### 5. 在系統內設定
 
@@ -167,7 +171,7 @@ git clone https://github.com/seedmediatw-bot/CRM-HR.git
 ### 更新程式碼
 
 ```bash
-git add index.html cloudflare-worker.js README.md
+git add index.html README.md
 git commit -m "說明本次修改內容"
 git push
 ```
@@ -183,7 +187,7 @@ git push
 |---|---|
 | 讀取失敗 / 資料庫 not found | 確認 Notion 資料庫已連接 Integration（點 `...` → Connect to） |
 | AI 功能沒反應 | 確認 Cloudflare Worker 的 `GEMINI_API_KEY` 已設定 |
-| 報帳圖片無法上傳 | 確認 Worker 有 `NOTION_TOKEN`，且 Notion Files API 已啟用 |
+| 審核按鈕點了沒反應 | 確認 Cloudflare Worker 的 CORS 設定包含 `PATCH` 方法 |
 | 網頁白畫面 | 確認 GitHub Pages 已啟用，分支設定為 main |
 | 設定無法儲存 | 確認瀏覽器未使用無痕模式（LocalStorage 被封鎖） |
 
@@ -191,7 +195,7 @@ git push
 
 ## 🗺️ 開發計畫
 
-- [ ] Google Drive 發票同步（串接 Drive API 進行圖片雲端備份）
-- [ ] 前端圖片自動壓縮（優化手機拍照上傳成功率）
+- [ ] 收據圖片自動上傳（Cloudflare R2 串接）
+- [ ] LINE Bot / Email 審核通知（送審通知主管、核准駁回通知申請人）
 - [ ] CRM 數據視覺化（拜訪頻率與客戶分佈統計圖表）
-- [ ] 自訂網域（購買網域指向 GitHub Pages）
+- [ ] Google Drive 發票同步備份
