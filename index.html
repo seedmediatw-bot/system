@@ -2719,6 +2719,13 @@
           return '<div class="' + cls + '"><div class="tldot">' + icon + '</div><div class="tllbl">' + lbl + '</div></div>';
         }).join('');
         var sc = r.status === '已核准' ? 'tgreen' : r.status === '已駁回' ? 'tred' : 'tyellow';
+        var approveLabel = (r.type === 'expense' && r.step >= 2) ? '✓ 財務確認' : '✓ 核准';
+        var actionBtns = r.status === '待審核'
+          ? '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
+            + '<button class="btn btnsm" style="background:var(--success);color:#fff;border-color:var(--success);flex:1" onclick="approveRecord(\'' + r.nid + '\',\'' + r.type + '\',' + r.step + ')">' + approveLabel + '</button>'
+            + '<button class="btn btnsm" style="background:var(--danger);color:#fff;border-color:var(--danger);flex:1" onclick="rejectRecord(\'' + r.nid + '\')">✗ 駁回</button>'
+            + '</div>'
+          : '';
         return '<div class="card" style="padding:16px 20px;margin-bottom:10px">'
           + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'
           + '<div><div style="font-size:14px;font-weight:600">' + r.name + ' <span style="font-size:11px;font-weight:400;color:var(--text3)">' + r.id + '</span></div>'
@@ -2727,7 +2734,9 @@
           + '<span class="tag ' + sc + '">' + r.status + '</span>'
           + (r.type === 'expense' ? '<button class="btn btnsm" onclick="viewReceipts(\'' + r.nid + '\')" style="padding:3px 8px;font-size:11px">📎 查看附件</button>' : '')
           + '</div></div>'
-          + '<div class="tl">' + tl + '</div></div>';
+          + '<div class="tl">' + tl + '</div>'
+          + actionBtns
+          + '</div>';
       }).join('') : '<div class="card"><div class="empty">尚無申請紀錄</div></div>';
     }
 
@@ -2757,6 +2766,38 @@
     }
     function closeReceipts() {
         document.getElementById('modal-receipts').classList.remove('open');
+    }
+
+    // ── 審核動作 ───────────────────────────────────────────
+    function _patchStatus(nid, newStatus) {
+      showToast('更新中...', '');
+      fetch(API_BASE + '/api/notion/pages/' + nid, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+        body: JSON.stringify({ properties: { '審核狀態': { select: { name: newStatus } } } })
+      }).then(function(res) {
+        if (!res.ok) throw new Error();
+        var r = RECORDS.find(function(x){ return x.nid === nid; });
+        if (r) {
+          r.status = newStatus;
+          if (newStatus === '已核准') r.step = 4;
+          else if (newStatus === '已駁回') r.step = -1;
+          else if (newStatus === '待財務確認') r.step = 2;
+        }
+        renderTracker();
+        showToast('審核狀態已更新：' + newStatus, 'ok');
+      }).catch(function() {
+        showToast('更新失敗，請確認 Notion 連線', 'err');
+      });
+    }
+    function approveRecord(nid, type, step) {
+      var newStatus;
+      if (type === 'expense' && step < 2) newStatus = '待財務確認';
+      else newStatus = '已核准';
+      _patchStatus(nid, newStatus);
+    }
+    function rejectRecord(nid) {
+      _patchStatus(nid, '已駁回');
     }
 
     // ── Notion ─────────────────────────────────────────────
@@ -2796,7 +2837,7 @@
             var id = (type === 'leave' ? 'REQ' : type === 'expense' ? 'EXP' : 'EMP') + '-' + String(Date.now()).slice(-4);
             if (type !== 'onboarding') {
               RECORDS.unshift({
-                id: id, type: type, name: data.name, dept: data.dept || '',
+                nid: page.id, id: id, type: type, name: data.name, dept: data.dept || '',
                 title: type === 'leave' ? data.type + ' ' + data.days + ' 天' : type === 'checkin' ? data.date + ' 簽到' : '報帳 NT$' + data.total,
                 status: type === 'checkin' ? '已記錄' : '待審核', step: type === 'checkin' ? 4 : 1, date: new Date().toISOString().split('T')[0]
               });
