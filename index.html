@@ -2834,7 +2834,7 @@
       showToast('送出中...', '');
       var props;
       if (type === 'leave') props = buildLeaveProps(data);
-      else if (type === 'expense') props = buildExpenseProps(data);
+      else if (type === 'expense') props = buildExpenseProps(data, fileIds);
       else if (type === 'checkin') props = buildCheckinProps(data);
       else props = buildOnboardingProps(data);
       
@@ -2873,10 +2873,10 @@
         '請假天數': { number: parseFloat(d.days) || 0 }, '請假原因': { rich_text: rt(d.reason) }, '審核狀態': { select: { name: '待審核' } }
       };
     }
-    function buildExpenseProps(d) {
+    function buildExpenseProps(d, fileIds) {
       var id = 'EXP-' + String(Date.now()).slice(-4);
       var items = d.items.map(function (i) { return i.desc + '（' + i.cat + '）NT$' + i.amount; }).join('、');
-      return {
+      var props = {
         '申請編號': { title: rt(id) }, '姓名': { rich_text: rt(d.name) }, '部門': { select: { name: d.dept } },
         '合計金額': { number: Number(d.total) || 0 }, '費用明細': { rich_text: rt(items) },
         '專案用途': { rich_text: rt(d.project) }, '帳號末5碼': { rich_text: rt(d.bank) },
@@ -2884,6 +2884,12 @@
         '備註': { rich_text: rt([d.note, d.receipt ? '收據連結：' + d.receipt : ''].filter(Boolean).join('\n')) },
         '審核狀態': { select: { name: '待主管審核' } }
       };
+      if (fileIds && fileIds.length) {
+        props['收據圖片'] = { files: fileIds.map(function(fid, i) {
+          return { name: 'receipt-' + (i+1) + '.jpg', type: 'file_upload', file_upload: { id: fid } };
+        })};
+      }
+      return props;
     }
     function buildOnboardingProps(d) {
       var id = 'EMP-' + String(Date.now()).slice(-4);
