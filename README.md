@@ -4,16 +4,6 @@
 
 ---
 
-## 🌐 線上網址
-
-| 服務 | 網址 |
-|---|---|
-| **HR & CRM 系統** | https://seedmediatw-bot.github.io/CRM-HR |
-| **Cloudflare Worker（API 代理）** | https://shy-sun-7610.seedmediatw.workers.dev |
-| **Worker 健康檢查** | https://shy-sun-7610.seedmediatw.workers.dev/api/status |
-
-> 登入密碼：8 位數（請洽系統管理員）
-
 ---
 
 ## 🏗️ 系統架構
@@ -59,10 +49,12 @@ Cloudflare Worker（API 代理，隱藏 API 金鑰）
 
 ### CRM 相關資料庫
 
-| 資料庫 | ID |
+| 資料庫 | 說明 |
 |---|---|
-| CRM 客戶總覽 | `3568bb31aaa281bcb7b1f4550e01795c` |
-| 拜訪記錄 | `d68816abcca34320b8e3fcba1029299e` |
+| CRM 客戶總覽 | 客戶主檔，含狀態、優先級、跟進日期 |
+| 拜訪記錄 | 每次拜訪的詳細紀錄 |
+
+> 資料庫 ID 請在系統的「Notion 設定」面板中查看與填入，不在此公開紀錄。
 
 ---
 
