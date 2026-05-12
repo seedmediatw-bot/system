@@ -2673,8 +2673,8 @@
         });
         expenseResults.forEach(function (page) {
           var p = page.properties;
-          var rawStatus = gp(p, '審核狀態', 'select') || '待主管審核';
-          var dispStatus = rawStatus === '已核准' ? '已核准' : rawStatus === '已駁回' ? '已駁回' : '待審核';
+          var rawStatus = gp(p, '審核狀態', 'select') || '待審核';
+          var dispStatus = rawStatus === '已核准' ? '已核准' : rawStatus === '已駁回' ? '已駁回' : rawStatus === '待財務確認' ? '待財務確認' : '待審核';
           var step = rawStatus === '已核准' ? 4 : rawStatus === '已駁回' ? -1 : rawStatus === '待財務確認' ? 2 : 1;
           RECORDS.push({
             nid: page.id,
@@ -2703,11 +2703,13 @@
           && (!type || r.type === type);
       });
       var pending = RECORDS.filter(function (r) { return r.status === '待審核'; }).length;
+      var finance = RECORDS.filter(function (r) { return r.status === '待財務確認'; }).length;
       var approved = RECORDS.filter(function (r) { return r.status === '已核准'; }).length;
       var rejected = RECORDS.filter(function (r) { return r.status === '已駁回'; }).length;
       document.getElementById('trk-stats').innerHTML =
         '<div class="stat"><div class="statn">' + RECORDS.length + '</div><div class="statl">全部申請</div></div>'
         + '<div class="stat"><div class="statn" style="color:var(--warning)">' + pending + '</div><div class="statl">待審核</div></div>'
+        + (finance ? '<div class="stat"><div class="statn" style="color:var(--info)">' + finance + '</div><div class="statl">待財務確認</div></div>' : '')
         + '<div class="stat"><div class="statn" style="color:var(--success)">' + approved + '</div><div class="statl">已核准</div></div>'
         + '<div class="stat"><div class="statn" style="color:var(--danger)">' + rejected + '</div><div class="statl">已駁回</div></div>';
       document.getElementById('trk-list').innerHTML = f.length ? f.map(function (r) {
@@ -2718,9 +2720,9 @@
           else { if (i < r.step) { cls = 'tlstep done'; icon = '✓'; } else if (i === r.step) { cls = 'tlstep cur'; icon = '…'; } }
           return '<div class="' + cls + '"><div class="tldot">' + icon + '</div><div class="tllbl">' + lbl + '</div></div>';
         }).join('');
-        var sc = r.status === '已核准' ? 'tgreen' : r.status === '已駁回' ? 'tred' : 'tyellow';
-        var approveLabel = (r.type === 'expense' && r.step >= 2) ? '✓ 財務確認' : '✓ 核准';
-        var actionBtns = r.status === '待審核'
+        var sc = r.status === '已核准' ? 'tgreen' : r.status === '已駁回' ? 'tred' : r.status === '待財務確認' ? 'tblue' : 'tyellow';
+        var approveLabel = r.status === '待財務確認' ? '✓ 財務確認' : (r.type === 'expense' && r.step >= 2) ? '✓ 財務確認' : '✓ 核准';
+        var actionBtns = (r.status === '待審核' || r.status === '待財務確認')
           ? '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
             + '<button class="btn btnsm" style="background:var(--success);color:#fff;border-color:var(--success);flex:1" onclick="approveRecord(\'' + r.nid + '\',\'' + r.type + '\',' + r.step + ')">' + approveLabel + '</button>'
             + '<button class="btn btnsm" style="background:var(--danger);color:#fff;border-color:var(--danger);flex:1" onclick="rejectRecord(\'' + r.nid + '\')">✗ 駁回</button>'
