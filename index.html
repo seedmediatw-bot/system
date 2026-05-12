@@ -2811,6 +2811,7 @@
 
     // ── Notion ─────────────────────────────────────────────
     function appendImageBlocks(pageId, fileIds) {
+      showToast('[debug] 附加圖片 IDs：' + fileIds.join(',').slice(0,40), '');
       var blocks = fileIds.map(function(fid){
         return { object:'block', type:'image', image:{ type:'file_upload', file_upload:{ id: fid } } };
       });
@@ -2819,8 +2820,9 @@
         headers: { 'Content-Type':'application/json', 'x-notion-token': nToken },
         body: JSON.stringify({ children: blocks })
       }).then(function(r){
-        if (!r.ok) return r.text().then(function(t){ showToast('圖片附加失敗：' + t.slice(0,80), 'err'); });
-      }).catch(function(e){ showToast('圖片附加錯誤：' + (e.message||''), 'err'); });
+        if (!r.ok) return r.text().then(function(t){ showToast('[debug] 附加失敗 ' + r.status + '：' + t.slice(0,80), 'err'); });
+        showToast('[debug] 附加成功 ' + r.status, 'ok');
+      }).catch(function(e){ showToast('[debug] 附加錯誤：' + (e.message||''), 'err'); });
     }
     function pushNotion(type, data, fileIds) {
       var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
