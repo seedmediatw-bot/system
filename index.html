@@ -2476,7 +2476,7 @@
         return fetch(API_BASE + '/api/gemini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gemini-2.0-flash', contents: [{ parts: parts }] })
+          body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: parts }] })
         });
       })
       .then(function(r) { 
@@ -3064,7 +3064,7 @@
       fetch(API_BASE + '/api/gemini', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-2.5-flash',
           systemInstruction: { parts: [{ text: '你是 HR 系統的 AI 助理，協助使用者操作系統（請假、報帳、入職、查詢、Notion 設定）。請用繁體中文簡潔回答，不超過 120 字。' }] },
           contents: [{ role: 'user', parts: [{ text: text }] }]
         })
@@ -3475,7 +3475,7 @@ function loadClients() {
       return fetch(API_BASE + '/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gemini-2.0-flash', contents: [{ role: 'user', parts: parts }] })
+        body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: parts }] })
       });
     })
     .then(function(r){ 
