@@ -2273,6 +2273,7 @@
         note: document.getElementById('e-note').value
       };
       var photoFiles = _normalPhotoFiles.filter(function(f){ return f; });
+      showToast('[debug] 圖片數：' + photoFiles.length + '（_normalPhotoFiles：' + _normalPhotoFiles.length + '）', photoFiles.length ? 'ok' : 'err');
       if (!photoFiles.length) {
           LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: [] });
           pushNotion('expense', data);
