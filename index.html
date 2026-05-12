@@ -2472,7 +2472,7 @@
         var parts = images.map(function(img) {
           return { inlineData: { mimeType: img.mimeType, data: img.data } };
         });
-        parts.push({ text: '請辨識這' + images.length + '張發票/收據。只回傳 JSON 陣列，不要其他文字，格式：[{"desc":"費用說明","cat":"交通費","date":"YYYY-MM-DD","amount":數字},...]。類別只能是：' + CATS.join('、') + '。' });
+        parts.push({ text: '請辨識這' + images.length + '張發票或收據。這可能是台灣統一發票（只有 QR Code 和總金額）或一般收據（有明細）。\n處理規則：\n1. 若是台灣統一發票：請嘗試讀取 QR Code 取得日期與金額；若 QR Code 無法讀取，則從畫面上的數字取得總金額與日期；描述填「發票消費」或店家名稱（若可見）。\n2. 若是一般收據：依明細各自列一筆，填入品項名稱、類別、日期、金額。\n3. 若一張發票有多筆可辨識明細就拆成多筆；若只有總金額就填一筆。\n只回傳 JSON 陣列，不要其他文字，格式：[{"desc":"費用說明","cat":"類別","date":"YYYY-MM-DD","amount":數字},...]。類別只能是：' + CATS.join('、') + '。日期若無法辨識請填今天：' + new Date().toISOString().split('T')[0] + '。' });
         return fetch(API_BASE + '/api/gemini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
