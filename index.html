@@ -2273,7 +2273,6 @@
         note: document.getElementById('e-note').value
       };
       var photoFiles = _normalPhotoFiles.filter(function(f){ return f; });
-      showToast('[debug] 圖片數：' + photoFiles.length + '（_normalPhotoFiles：' + _normalPhotoFiles.length + '）', photoFiles.length ? 'ok' : 'err');
       if (!photoFiles.length) {
           LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: [] });
           pushNotion('expense', data);
@@ -2289,24 +2288,25 @@
         return new Promise(function(resolve){
           var reader = new FileReader();
           reader.onload = function(e){
-            fetch(API_BASE + '/api/notion-upload', {
+            fetch(API_BASE + '/api/drive-upload', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ base64: e.target.result.split(',')[1], mimeType: file.type || 'image/jpeg', filename: file.name || ('receipt-' + (i+1) + '.jpg') })
             }).then(function(r){
-              if (!r.ok) return r.text().then(function(t){ console.error('[notion-upload error]', t); showToast('圖片上傳失敗：' + t.slice(0,80), 'err'); resolve(null); });
+              if (!r.ok) return r.text().then(function(t){ showToast('圖片上傳失敗：' + t.slice(0,80), 'err'); resolve(null); });
               return r.json().then(function(d){
-                if (!d.id) { showToast('圖片上傳失敗：Notion 未回傳 ID', 'err'); resolve(null); return; }
-                resolve(d.id);
+                if (!d.url) { showToast('圖片上傳失敗：未取得連結', 'err'); resolve(null); return; }
+                resolve(d.url);
               });
             }).catch(function(e){ showToast('圖片上傳錯誤：' + (e.message||''), 'err'); resolve(null); });
           };
           reader.onerror = function(){ resolve(null); };
           reader.readAsDataURL(file);
         });
-      })).then(function(ids){
+      })).then(function(urls){
+        var validUrls = urls.filter(function(u){ return u; });
         LOCAL_EXPENSE_CACHE.unshift({ name: data.name, amount: data.total, date: new Date().toISOString().split('T')[0], status: '送出中...', localPhotos: _normalPhotos.filter(function(u){ return u; }) });
-        pushNotion('expense', data, ids.filter(function(id){ return id; }));
+        pushNotion('expense', data, validUrls);
         resetExpense();
         setTimeout(function(){
           btn.disabled = false; btn.textContent = '送出申請';
@@ -2811,19 +2811,18 @@
     }
 
     // ── Notion ─────────────────────────────────────────────
-    function appendImageBlocks(pageId, fileIds) {
-      showToast('[debug] 附加圖片 IDs：' + fileIds.join(',').slice(0,40), '');
-      var blocks = fileIds.map(function(fid){
-        return { object:'block', type:'image', image:{ type:'file_upload', file_upload:{ id: fid } } };
+    function appendImageBlocks(pageId, imageUrls) {
+      var blocks = imageUrls.map(function(url){
+        return { object:'block', type:'image', image:{ type:'external', external:{ url: url } } };
       });
       fetch(API_BASE + '/api/notion/blocks/' + pageId + '/children', {
         method: 'PATCH',
         headers: { 'Content-Type':'application/json', 'x-notion-token': nToken },
         body: JSON.stringify({ children: blocks })
       }).then(function(r){
-        if (!r.ok) return r.text().then(function(t){ showToast('[debug] 附加失敗 ' + r.status + '：' + t.slice(0,80), 'err'); });
-        showToast('[debug] 附加成功 ' + r.status, 'ok');
-      }).catch(function(e){ showToast('[debug] 附加錯誤：' + (e.message||''), 'err'); });
+        if (!r.ok) return r.text().then(function(t){ showToast('附加圖片失敗：' + t.slice(0,60), 'err'); });
+        showToast('收據圖片已附加至 Notion！', 'ok');
+      }).catch(function(e){ showToast('附加圖片錯誤：' + (e.message||''), 'err'); });
     }
     function pushNotion(type, data, fileIds) {
       var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
@@ -2885,11 +2884,6 @@
         '備註': { rich_text: rt([d.note, d.receipt ? '收據連結：' + d.receipt : ''].filter(Boolean).join('\n')) },
         '審核狀態': { select: { name: '待主管審核' } }
       };
-      if (fileIds && fileIds.length) {
-        props['收據圖片'] = { files: fileIds.map(function(fid, i) {
-          return { name: 'receipt-' + (i+1) + '.jpg', type: 'file_upload', file_upload: { id: fid } };
-        })};
-      }
       return props;
     }
     function buildOnboardingProps(d) {
