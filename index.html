@@ -2292,7 +2292,13 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
               body: JSON.stringify({ base64: e.target.result.split(',')[1], mimeType: file.type || 'image/jpeg', filename: file.name || ('receipt-' + (i+1) + '.jpg') })
-            }).then(function(r){ return r.json(); }).then(function(d){ resolve(d.id || null); }).catch(function(){ resolve(null); });
+            }).then(function(r){
+              if (!r.ok) return r.text().then(function(t){ showToast('圖片上傳失敗：' + t.slice(0,60), 'err'); resolve(null); });
+              return r.json().then(function(d){
+                if (!d.id) { showToast('圖片上傳失敗：Notion 未回傳 ID', 'err'); resolve(null); return; }
+                resolve(d.id);
+              });
+            }).catch(function(e){ showToast('圖片上傳錯誤：' + (e.message||''), 'err'); resolve(null); });
           };
           reader.onerror = function(){ resolve(null); };
           reader.readAsDataURL(file);
@@ -2808,7 +2814,9 @@
         method: 'PATCH',
         headers: { 'Content-Type':'application/json', 'x-notion-token': nToken },
         body: JSON.stringify({ children: blocks })
-      }).catch(function(){ showToast('圖片附加失敗，但表單已送出', 'err'); });
+      }).then(function(r){
+        if (!r.ok) return r.text().then(function(t){ showToast('圖片附加失敗：' + t.slice(0,80), 'err'); });
+      }).catch(function(e){ showToast('圖片附加錯誤：' + (e.message||''), 'err'); });
     }
     function pushNotion(type, data, fileIds) {
       var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
