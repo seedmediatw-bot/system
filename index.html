@@ -1229,6 +1229,28 @@
     .ai-status.done{color:var(--success)}
     .ai-status.err{color:var(--danger)}
     /* --- CRM CSS END --- */
+    /* --- Batch Import --- */
+    .batch-card{border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;background:var(--surface)}
+    .batch-card.is-add{border-left:4px solid var(--success)}
+    .batch-card.is-update{border-left:4px solid var(--accent)}
+    .batch-card.is-skip{opacity:.45}
+    .batch-head{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer}
+    .batch-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;flex-shrink:0}
+    .batch-badge.add{background:#d1fae5;color:#065f46}
+    .batch-badge.update{background:#dbeafe;color:#1e40af}
+    .batch-name{font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .batch-matched{font-size:11px;color:var(--text2);flex-shrink:0}
+    .batch-skip-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;flex-shrink:0}
+    .batch-skip-btn:hover{background:var(--bg);color:var(--danger)}
+    .batch-body{padding:0 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:12px}
+    .batch-field{display:flex;flex-direction:column;gap:2px}
+    .batch-field label{color:var(--text3);font-size:11px}
+    .batch-field input,.batch-field select,.batch-field textarea{font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);width:100%}
+    .batch-field textarea{resize:vertical;min-height:52px}
+    .batch-field-full{grid-column:1/-1}
+    .batch-summary-row{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 10px;font-size:12px;color:var(--text2)}
+    .batch-summary-tag{background:var(--bg);border-radius:4px;padding:2px 8px}
+    /* --- Batch Import END --- */
 
     /* --- Modal & Timeline --- */
     .modal {
@@ -1404,6 +1426,10 @@
         <div class="nav-item" onclick="navTo('crm-update',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span>更新客戶</span>
+        </div>
+        <div class="nav-item" onclick="navTo('crm-batch',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span>批次 AI 匯入</span>
         </div>
         </div><!-- /nav-crm -->
 
@@ -2071,7 +2097,31 @@
         </div>
       </div>
 
-      
+      <!-- CRM 批次 AI 匯入 -->
+      <div class="page" id="page-crm-batch">
+        <div class="ph"><h2>批次 AI 匯入</h2><p>貼上會議記錄，AI 自動識別多位客戶並一次更新或新增</p></div>
+        <div class="ai-area">
+          <div class="ct">✦ 貼上會議記錄</div>
+          <div class="fg" style="margin-bottom:10px">
+            <textarea id="batch-ai-input" rows="7" placeholder="例：&#10;今天與 ABC公司 王總開會，討論影片製作方案，預算約15萬，下週回覆...&#10;另外 XYZ集團 李經理來電，對上次提案有疑慮，需補充說明...&#10;新客戶 海洋科技 陳董，透過介紹認識，有拍攝需求..."></textarea>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btna" onclick="batchAnalyze()">✦ AI 批次分析</button>
+            <span class="ai-status" id="batch-ai-status"></span>
+          </div>
+        </div>
+        <div id="batch-results" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--text2)">共 <span id="batch-count">0</span> 筆　<span style="color:var(--success);font-weight:500" id="batch-add-count"></span>　<span style="color:var(--accent);font-weight:500" id="batch-update-count"></span></div>
+            <button class="btn btnp" onclick="submitBatch()">全部送出</button>
+          </div>
+          <div id="batch-cards"></div>
+          <div style="margin-top:14px;text-align:right">
+            <button class="btn btnp" onclick="submitBatch()">全部送出</button>
+          </div>
+        </div>
+      </div>
+
         <!-- Settings -->
         <div class="page" id="page-settings">
           <div class="ph">
@@ -2411,7 +2461,8 @@
     var aiOpen = false;
     var AVCOLS = [['#E6F1FB', '#0C447C'], ['#E1F5EE', '#085041'], ['#FAEEDA', '#633806'], ['#EEEDFE', '#3C3489'], ['#FAECE7', '#712B13'], ['#EAF3DE', '#27500A']];
     var CATS = ['交通費', '餐費', '住宿費', '材料費', '軟體訂閱', '培訓費', '其他'];
-    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄' };
+    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄', 'crm-batch': '批次 AI 匯入' };
+    var BATCH_ITEMS = [];
 
     // ── Navigation ─────────────────────────────────────────
     function toggleSidebar() {
@@ -3847,6 +3898,171 @@ function loadClients() {
     }).then(function(r) {
         if (r.ok) loadClients();
     });
+  }
+
+  // ── 批次 AI 匯入 ───────────────────────────────────────────
+
+  var BATCH_PROMPT = '你是一個 CRM 助理。從以下會議記錄中找出所有客戶，每位客戶單獨一個 JSON 物件，回傳一個 JSON 陣列。只回傳 JSON 陣列，不要其他文字。\n\n' +
+    '每個物件的欄位：\n' +
+    '- clientName: 客戶/公司名稱（字串，必填）\n' +
+    '- status: 潛在客戶狀態（只能是：戰略夥伴/已簽約/快要簽約/有意願待簽約/MOU 待簽/已報價/報價中/製作中/跟進中/暫緩，若無法判斷則 null）\n' +
+    '- priority: 優先級（只能是：本週完成/本週推進/跟進中/持續維護/進行中，若無法判斷則 null）\n' +
+    '- reaction: 客戶反應（只能是：正面/猶豫/有疑慮，若無法判斷則 null）\n' +
+    '- contactMethod: 聯繫方式（只能是：電話/視訊/見面/LINE/Email，若無法判斷則 null）\n' +
+    '- lastContactDate: 最近聯繫日期（YYYY-MM-DD，今天是 ' + new Date().toISOString().split('T')[0] + '，若無法判斷則 null）\n' +
+    '- nextFollowDate: 下次跟進日期（YYYY-MM-DD，若無法判斷則 null）\n' +
+    '- nextAction: 下一步行動（一句話，若無則 null）\n' +
+    '- commitment: 承諾事項（一句話，若無則 null）\n' +
+    '- notes: 詳細現況備註（若無則 null）\n' +
+    '- amount: 專案金額（純數字，若無則 null）\n\n' +
+    '會議記錄：\n';
+
+  function matchClient(name) {
+    if (!name || !CRM_DATA.length) return null;
+    var n = name.trim();
+    return CRM_DATA.find(function(c) {
+      var cn = (c.name || '').trim();
+      return cn === n || cn.includes(n) || n.includes(cn);
+    }) || null;
+  }
+
+  function batchAnalyze() {
+    var text = document.getElementById('batch-ai-input').value.trim();
+    if (!text) {
+      document.getElementById('batch-ai-status').textContent = '請先貼上會議記錄';
+      document.getElementById('batch-ai-status').className = 'ai-status err';
+      return;
+    }
+    document.getElementById('batch-ai-status').textContent = 'AI 分析中...';
+    document.getElementById('batch-ai-status').className = 'ai-status thinking';
+    document.getElementById('batch-results').style.display = 'none';
+
+    fetch(crmApiBase + '/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: BATCH_PROMPT + text }] }] })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var raw = data.candidates && data.candidates[0] && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
+      var json = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      var results = JSON.parse(json);
+      if (!Array.isArray(results)) results = [results];
+      document.getElementById('batch-ai-status').textContent = '✓ 找到 ' + results.length + ' 位客戶，請確認後送出';
+      document.getElementById('batch-ai-status').className = 'ai-status done';
+      renderBatchCards(results);
+    })
+    .catch(function(e) {
+      document.getElementById('batch-ai-status').textContent = '分析失敗，請再試一次';
+      document.getElementById('batch-ai-status').className = 'ai-status err';
+    });
+  }
+
+  function renderBatchCards(results) {
+    BATCH_ITEMS = results.map(function(r, i) {
+      var matched = matchClient(r.clientName);
+      return { idx: i, data: r, matched: matched, skip: false };
+    });
+
+    var addCount = BATCH_ITEMS.filter(function(x) { return !x.matched; }).length;
+    var updCount = BATCH_ITEMS.filter(function(x) { return !!x.matched; }).length;
+    document.getElementById('batch-count').textContent = BATCH_ITEMS.length;
+    document.getElementById('batch-add-count').textContent = addCount ? '新增 ' + addCount + ' 筆' : '';
+    document.getElementById('batch-update-count').textContent = updCount ? '更新 ' + updCount + ' 筆' : '';
+
+    document.getElementById('batch-cards').innerHTML = BATCH_ITEMS.map(function(item) {
+      var d = item.data;
+      var isAdd = !item.matched;
+      var tags = [d.status, d.priority, d.reaction, d.contactMethod, d.lastContactDate].filter(Boolean);
+      return '<div class="batch-card ' + (isAdd ? 'is-add' : 'is-update') + '" id="bcard-' + item.idx + '">' +
+        '<div class="batch-head">' +
+          '<span class="batch-badge ' + (isAdd ? 'add' : 'update') + '">' + (isAdd ? '新增' : '更新') + '</span>' +
+          '<span class="batch-name">' + (d.clientName || '未知') + '</span>' +
+          (item.matched ? '<span class="batch-matched">比對：' + item.matched.name + '</span>' : '') +
+          '<button class="batch-skip-btn" onclick="toggleBatchSkip(' + item.idx + ')">略過</button>' +
+        '</div>' +
+        (tags.length ? '<div class="batch-summary-row">' + tags.map(function(t){ return '<span class="batch-summary-tag">' + t + '</span>'; }).join('') + '</div>' : '') +
+        '<div class="batch-body">' +
+          batchField('batchnotes-' + item.idx, '備註', d.notes || '', 'textarea', true) +
+          batchField('batchaction-' + item.idx, '下一步行動', d.nextAction || '', 'input', false) +
+          batchField('batchcommit-' + item.idx, '承諾事項', d.commitment || '', 'input', false) +
+          batchField('batchnext-' + item.idx, '下次跟進日期', d.nextFollowDate || '', 'date', false) +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    document.getElementById('batch-results').style.display = '';
+  }
+
+  function batchField(id, label, val, type, full) {
+    var cls = 'batch-field' + (full ? ' batch-field-full' : '');
+    if (type === 'textarea') {
+      return '<div class="' + cls + '"><label>' + label + '</label><textarea id="' + id + '" rows="2">' + val + '</textarea></div>';
+    }
+    if (type === 'date') {
+      return '<div class="' + cls + '"><label>' + label + '</label><input type="date" id="' + id + '" value="' + val + '"></div>';
+    }
+    return '<div class="' + cls + '"><label>' + label + '</label><input type="text" id="' + id + '" value="' + val + '"></div>';
+  }
+
+  function toggleBatchSkip(idx) {
+    BATCH_ITEMS[idx].skip = !BATCH_ITEMS[idx].skip;
+    var card = document.getElementById('bcard-' + idx);
+    card.classList.toggle('is-skip', BATCH_ITEMS[idx].skip);
+    var btn = card.querySelector('.batch-skip-btn');
+    btn.textContent = BATCH_ITEMS[idx].skip ? '恢復' : '略過';
+  }
+
+  function submitBatch() {
+    var active = BATCH_ITEMS.filter(function(x) { return !x.skip; });
+    if (!active.length) { showToast('沒有要送出的項目', 'err'); return; }
+    showToast('送出中（共 ' + active.length + ' 筆）...', '');
+
+    var tasks = active.map(function(item) {
+      var d = item.data;
+      var notes = document.getElementById('batchnotes-' + item.idx).value.trim();
+      var action = document.getElementById('batchaction-' + item.idx).value.trim();
+      var commit = document.getElementById('batchcommit-' + item.idx).value.trim();
+      var nextdate = document.getElementById('batchnext-' + item.idx).value;
+      var props = {};
+      if (d.status) props['潛在客戶狀態'] = { select: { name: d.status } };
+      if (d.priority) props['優先級'] = { select: { name: d.priority } };
+      if (d.reaction) props['客戶反應'] = { select: { name: d.reaction } };
+      if (d.contactMethod) props['聯繫方式'] = { select: { name: d.contactMethod } };
+      if (d.lastContactDate) props['最近聯繫日期'] = { date: { start: d.lastContactDate } };
+      if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
+      if (action) props['下一步行動'] = { rich_text: rt(action) };
+      if (commit) props['承諾事項'] = { rich_text: rt(commit) };
+      if (notes) props['詳細現況備註'] = { rich_text: rt(notes) };
+      if (d.amount) props['專案金額'] = { number: parseInt(d.amount) || 0 };
+
+      if (item.matched) {
+        return fetch(crmApiBase + '/api/crm/pages/' + item.matched.id, {
+          method: 'PATCH', headers: crmH(),
+          body: JSON.stringify({ properties: props })
+        });
+      } else {
+        props['客戶名稱'] = { title: rt(d.clientName) };
+        return fetch(crmApiBase + '/api/crm/pages', {
+          method: 'POST', headers: crmH(),
+          body: JSON.stringify({ parent: { database_id: nDBs.crm }, properties: props })
+        });
+      }
+    });
+
+    Promise.all(tasks).then(function(responses) {
+      var ok = responses.filter(function(r) { return r.ok; }).length;
+      var fail = responses.length - ok;
+      if (fail === 0) {
+        showToast('✓ 全部 ' + ok + ' 筆已送出！', 'ok');
+        document.getElementById('batch-ai-input').value = '';
+        document.getElementById('batch-results').style.display = 'none';
+        document.getElementById('batch-ai-status').textContent = '';
+        loadClients();
+      } else {
+        showToast('完成 ' + ok + ' 筆，失敗 ' + fail + ' 筆', 'err');
+      }
+    }).catch(function() { showToast('網路錯誤，請稍後重試', 'err'); });
   }
 
   // ── Reset ──────────────────────────────────────────────────
