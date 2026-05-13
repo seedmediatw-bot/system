@@ -1260,40 +1260,84 @@
     }
     .modal.open { display: flex; }
     .modal-content {
-      background: var(--surface); width: 90%; max-width: 800px; max-height: 90vh;
+      background: var(--surface); width: 92%; max-width: 640px; max-height: 92vh;
       border-radius: var(--rl); display: flex; flex-direction: column;
-      box-shadow: 0 20px 50px rgba(0,0,0,.2); overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,.25); overflow: hidden;
     }
+    /* 標題列 */
     .modal-hdr {
-      padding: 16px 24px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between; background: var(--surface);
+      padding: 18px 20px 12px; display: flex; align-items: flex-start;
+      justify-content: space-between; background: var(--surface); flex-shrink: 0;
     }
-    .modal-body { padding: 24px; overflow-y: auto; flex: 1; background: var(--bg); }
-    .modal-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; }
-    @media (max-width: 768px) { .modal-grid { grid-template-columns: 1fr; } }
-    
-    .history-sec { background: var(--surface); border-radius: var(--r); padding: 16px; border: 1px solid var(--border); }
-    .timeline { position: relative; padding-left: 20px; border-left: 2px solid var(--border); margin-left: 10px; margin-top: 10px; }
-    .timeline-item { position: relative; margin-bottom: 20px; }
-    .timeline-item::before {
-      content: ''; position: absolute; left: -27px; top: 5px;
-      width: 12px; height: 12px; border-radius: 50%; background: var(--accent);
-      border: 2px solid var(--surface);
+    .m-client-title { display: flex; flex-direction: column; gap: 3px; }
+    .m-client-name { font-size: 18px; font-weight: 700; color: var(--text); }
+    .m-drive-link {
+      display: inline-flex; align-items: center; gap: 5px; margin-top: 2px;
+      font-size: 12px; color: var(--text2); text-decoration: none;
     }
-    .tl-date { font-size: 11px; color: var(--text3); font-weight: 600; margin-bottom: 4px; }
-    .tl-content { font-size: 13px; color: var(--text); background: var(--surface2); padding: 10px; border-radius: 8px; }
-    .tl-meta { font-size: 11px; color: var(--text2); margin-top: 6px; display: flex; gap: 8px; }
-    
-    .quick-call { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border); }
-    
+    .m-drive-link svg { width: 14px; height: 14px; }
+    .m-drive-link:hover { color: var(--accent); }
+    /* 狀態條 */
+    .m-status-bar {
+      display: flex; gap: 6px; padding: 0 20px 10px; flex-wrap: wrap;
+      align-items: center; flex-shrink: 0;
+    }
+    .m-badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .m-date-pills { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+    .m-date-pill { font-size: 11px; color: var(--text2); background: var(--bg); padding: 2px 8px; border-radius: 6px; }
+    .m-date-pill span { color: var(--text); font-weight: 600; }
+    /* 下一步行動 highlight */
+    .m-next-action {
+      margin: 0 20px 12px; background: #eff6ff;
+      border-left: 3px solid var(--accent); padding: 8px 12px;
+      border-radius: 0 8px 8px 0; flex-shrink: 0;
+    }
+    .dark .m-next-action { background: #1e2d40; }
+    .m-na-label { font-size: 11px; color: var(--accent); font-weight: 600; letter-spacing: .05em; margin-bottom: 2px; }
+    .m-na-text { font-size: 13px; color: var(--text); }
+    /* Tabs */
+    .m-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; background: var(--surface); }
+    .m-tab {
+      padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer;
+      border-bottom: 2px solid transparent; color: var(--text2); margin-bottom: -1px;
+      transition: color .15s;
+    }
+    .m-tab.active { color: var(--success); border-bottom-color: var(--success); }
+    .m-tab:hover:not(.active) { color: var(--text); }
+    /* Tab 內容 */
+    .modal-body { padding: 18px 20px; overflow-y: auto; flex: 1; background: var(--bg); }
+    .m-tab-panel { display: none; }
+    .m-tab-panel.active { display: block; }
+    /* 時間軸 */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-item { display: flex; gap: 12px; position: relative; padding-bottom: 18px; }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .tl-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); margin-top: 4px; flex-shrink: 0; }
+    .tl-dot.old { background: var(--border2); }
+    .tl-line { width: 2px; flex: 1; background: var(--border); margin-top: 4px; min-height: 12px; }
+    .timeline-item:last-child .tl-line { display: none; }
+    .tl-body { flex: 1; min-width: 0; }
+    .tl-date { font-size: 11px; color: var(--text3); font-weight: 600; margin-bottom: 3px; }
+    .tl-content { font-size: 13px; color: var(--text); line-height: 1.55; }
+    .tl-meta { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+    .tl-tag { font-size: 11px; background: var(--surface); color: var(--text2); padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border); }
+    /* 更新表單 */
+    .m-form-sec { margin-bottom: 16px; }
+    .m-form-title { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: .05em; margin-bottom: 10px; text-transform: uppercase; }
+    .m-divider { border: none; border-top: 1px dashed var(--border); margin: 16px 0; }
+    .m-btn-row { display: flex; gap: 8px; margin-top: 6px; }
+    .m-btn-primary { flex: 1; padding: 10px; border: none; border-radius: 8px; background: var(--success); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .m-btn-secondary { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
     .btn-drive {
       display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
       background: #fff; color: #5f6368; border: 1px solid var(--border);
       border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer;
       transition: all .2s; text-decoration: none;
     }
-    .btn-drive:hover { background: #f1f3f4; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .btn-drive:hover { background: #f1f3f4; }
     .btn-drive svg { width: 16px; height: 16px; }
+    @media (max-width: 480px) { .m-date-pills { margin-left: 0; } }
     /* --- Modal & Timeline END --- */
 
   </style>
@@ -2237,82 +2281,106 @@
   <!-- 客戶詳情彈窗 -->
   <div class="modal" id="modal-client">
     <div class="modal-content">
+
+      <!-- 標題列 -->
       <div class="modal-hdr">
-        <div style="display:flex; align-items:center; gap:12px">
-            <h3 id="m-client-name" style="margin:0">客戶詳情</h3>
-            <a id="m-drive-link" href="#" target="_blank" class="btn-drive" style="display:none">
-                <svg viewBox="0 0 24 24"><path fill="#FFC107" d="M15.39,10.15l-4.57-7.91c-0.27-0.47-0.78-0.75-1.32-0.75H4.51c-0.54,0-1.05,0.28-1.32,0.75L0.27,7.63c-0.27,0.47-0.27,1.04,0,1.5l2.92,5.06c0.27,0.47,0.78,0.75,1.32,0.75h4.51l4.57-7.91C15.66,10.56,15.66,10.15,15.39,10.15z"/><path fill="#2196F3" d="M23.73,14.87l-2.92-5.06c-0.27-0.47-0.78-0.75-1.32-0.75h-9.02l-4.57,7.91c-0.27,0.47-0.27,1.04,0,1.5l2.92,5.06c0.27,0.47,0.78,0.75,1.32,0.75h9.02c0.54,0,1.05-0.28,1.32-0.75l2.92-5.06C24,15.91,24,15.34,23.73,14.87z"/><path fill="#4CAF50" d="M15.39,10.15H6.37l4.57,7.91h9.02L15.39,10.15z"/></svg>
-                <span>Google Drive 搜尋</span>
-            </a>
+        <div class="m-client-title">
+          <div class="m-client-name" id="m-client-name">客戶詳情</div>
+          <a id="m-drive-link" href="#" target="_blank" class="m-drive-link" style="display:none">
+            <svg viewBox="0 0 24 24"><path fill="#FFC107" d="M15.39,10.15l-4.57-7.91c-0.27-0.47-0.78-0.75-1.32-0.75H4.51c-0.54,0-1.05,0.28-1.32,0.75L0.27,7.63c-0.27,0.47-0.27,1.04,0,1.5l2.92,5.06c0.27,0.47,0.78,0.75,1.32,0.75h4.51l4.57-7.91C15.66,10.56,15.66,10.15,15.39,10.15z"/><path fill="#2196F3" d="M23.73,14.87l-2.92-5.06c-0.27-0.47-0.78-0.75-1.32-0.75h-9.02l-4.57,7.91c-0.27,0.47-0.27,1.04,0,1.5l2.92,5.06c0.27,0.47,0.78,0.75,1.32,0.75h9.02c0.54,0,1.05-0.28,1.32-0.75l2.92-5.06C24,15.91,24,15.34,23.73,14.87z"/><path fill="#4CAF50" d="M15.39,10.15H6.37l4.57,7.91h9.02L15.39,10.15z"/></svg>
+            <span>Google Drive 搜尋</span>
+          </a>
         </div>
         <button class="btn btnsm" onclick="closeClientModal()">關閉</button>
       </div>
+
+      <!-- 狀態摘要條 -->
+      <div class="m-status-bar" id="m-status-bar"></div>
+
+      <!-- 下一步行動 highlight -->
+      <div class="m-next-action" id="m-next-action-box" style="display:none">
+        <div class="m-na-label">下一步行動</div>
+        <div class="m-na-text" id="m-next-action-text"></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="m-tabs">
+        <div class="m-tab active" onclick="switchModalTab('history', this)">歷史拜訪</div>
+        <div class="m-tab" onclick="switchModalTab('update', this)">更新 / 新增記錄</div>
+      </div>
+
+      <!-- Tab 內容 -->
       <div class="modal-body">
-        <div class="modal-grid">
-          <!-- 左側：基本資料與編輯 -->
-          <div>
-            <div class="ct">客戶狀態</div>
-            <div class="card" style="padding:16px; margin-bottom:16px">
-              <div class="fg" style="margin-bottom:10px">
-                <label>狀態</label>
-                <select id="m-status" onchange="syncModalToUpdate()">
+
+        <!-- Tab: 歷史拜訪 -->
+        <div id="m-panel-history" class="m-tab-panel active">
+          <div id="m-history-list"><div class="empty">載入歷史紀錄中...</div></div>
+        </div>
+
+        <!-- Tab: 更新 / 新增記錄 -->
+        <div id="m-panel-update" class="m-tab-panel">
+          <div class="m-form-sec">
+            <div class="m-form-title">主檔資料</div>
+            <div class="grid2" style="margin-bottom:10px">
+              <div class="fg"><label>狀態</label>
+                <select id="m-status">
                   <option>跟進中</option><option>有意願待簽約</option><option>報價中</option>
                   <option>已報價</option><option>快要簽約</option><option>MOU 待簽</option>
                   <option>已簽約</option><option>製作中</option><option>戰略夥伴</option><option>暫緩</option>
                 </select>
               </div>
-              <div class="fg" style="margin-bottom:10px">
-                <label>優先級</label>
-                <select id="m-priority" onchange="syncModalToUpdate()">
+              <div class="fg"><label>優先級</label>
+                <select id="m-priority">
                   <option>本週完成</option><option>本週推進</option><option>跟進中</option>
                   <option>持續維護</option><option>進行中</option>
                 </select>
               </div>
-              <div class="fg">
-                <label>下一步行動</label>
-                <input type="text" id="m-action" onchange="syncModalToUpdate()">
-              </div>
             </div>
-            <button class="btn btnp btnsm" style="width:100%" onclick="submitUpdateFromModal()">儲存主檔變更</button>
-            
-            <div class="quick-call">
-              <div class="ct">✦ 新增拜訪紀錄</div>
-              <div class="fg" style="margin-bottom:10px">
-                <label>拜訪日期</label><input type="date" id="m-call-date">
-              </div>
-              <div class="fg" style="margin-bottom:10px">
-                <label>會議摘要 *</label>
-                <textarea id="m-call-summary" rows="3" placeholder="今日進度..."></textarea>
-              </div>
-              <div class="grid2" style="margin-bottom:10px">
-                <div class="fg">
-                  <label>反應</label>
-                  <select id="m-call-reaction">
-                    <option>正面</option><option>猶豫</option><option>有疑慮</option>
-                  </select>
-                </div>
-                <div class="fg">
-                  <label>方式</label>
-                  <select id="m-call-contact">
-                    <option>見面</option><option>電話</option><option>視訊</option>
-                    <option>LINE</option><option>Email</option>
-                  </select>
-                </div>
-              </div>
-              <button class="btn btnp btnsm" style="width:100%;background:var(--success);border-color:var(--success)" onclick="submitCallFromModal()">送出紀錄並更新狀態</button>
+            <div class="fg" style="margin-bottom:10px">
+              <label>下一步行動</label>
+              <input type="text" id="m-action" placeholder="下一步要做什麼...">
+            </div>
+            <div class="fg">
+              <label>下次跟進日期</label>
+              <input type="date" id="m-nextdate">
             </div>
           </div>
-          
-          <!-- 右側：歷史時光機 -->
-          <div>
-            <div class="ct">歷史拜訪紀錄</div>
-            <div class="history-sec">
-              <div id="m-history-list">
-                <div class="empty">載入歷史紀錄中...</div>
+
+          <hr class="m-divider">
+
+          <div class="m-form-sec">
+            <div class="m-form-title">新增今日拜訪記錄（選填）</div>
+            <div class="fg" style="margin-bottom:10px">
+              <label>拜訪日期</label>
+              <input type="date" id="m-call-date">
+            </div>
+            <div class="fg" style="margin-bottom:10px">
+              <label>會議摘要</label>
+              <textarea id="m-call-summary" rows="3" placeholder="今日進度、討論結果...（填寫後才會新增拜訪記錄）"></textarea>
+            </div>
+            <div class="grid2">
+              <div class="fg"><label>客戶反應</label>
+                <select id="m-call-reaction">
+                  <option value="">請選擇</option>
+                  <option>正面</option><option>猶豫</option><option>有疑慮</option>
+                </select>
+              </div>
+              <div class="fg"><label>聯繫方式</label>
+                <select id="m-call-contact">
+                  <option value="">請選擇</option>
+                  <option>見面</option><option>電話</option><option>視訊</option>
+                  <option>LINE</option><option>Email</option>
+                </select>
               </div>
             </div>
+          </div>
+
+          <div class="m-btn-row">
+            <button class="m-btn-primary" onclick="submitBothFromModal()">儲存並新增記錄</button>
+            <button class="m-btn-secondary" onclick="submitUpdateFromModal()">僅更新主檔</button>
           </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -3447,23 +3515,63 @@ function loadClients() {
     selectedClientId = id;
     var c = CRM_DATA.filter(function(x){ return x.id === id; })[0];
     if (!c) return;
-    
+
+    // 標題
     document.getElementById('m-client-name').textContent = c.name;
-    document.getElementById('m-drive-link').href = 'https://drive.google.com/drive/search?q=' + encodeURIComponent(c.name);
+    var driveEl = document.getElementById('m-drive-link');
+    driveEl.href = 'https://drive.google.com/drive/search?q=' + encodeURIComponent(c.name);
+    driveEl.style.display = '';
+
+    // 狀態摘要條
+    var REACTION_COLOR = { '正面': 'tgreen', '猶豫': 'tyellow', '有疑慮': 'tred' };
+    var sc = STATUS_COLOR[c.status] || 'tgray';
+    var pc = PRIORITY_COLOR[c.priority] || 'tgray';
+    var rc = REACTION_COLOR[c.reaction] || '';
+    var bar = '';
+    if (c.status) bar += '<span class="tag ' + sc + ' m-badge">' + c.status + '</span>';
+    if (c.priority) bar += '<span class="tag ' + pc + ' m-badge">' + c.priority + '</span>';
+    if (c.reaction) bar += '<span class="tag ' + rc + ' m-badge">' + c.reaction + '</span>';
+    var pills = '';
+    if (c.lastdate) pills += '<span class="m-date-pill">上次 <span>' + c.lastdate + '</span></span>';
+    if (c.nextdate) pills += '<span class="m-date-pill">跟進 <span>' + c.nextdate + '</span></span>';
+    if (pills) bar += '<div class="m-date-pills">' + pills + '</div>';
+    document.getElementById('m-status-bar').innerHTML = bar;
+
+    // 下一步行動
+    var naBox = document.getElementById('m-next-action-box');
+    if (c.action) {
+      document.getElementById('m-next-action-text').textContent = c.action;
+      naBox.style.display = '';
+    } else {
+      naBox.style.display = 'none';
+    }
+
+    // 表單預填
     document.getElementById('m-status').value = c.status || '跟進中';
     document.getElementById('m-priority').value = c.priority || '跟進中';
     document.getElementById('m-action').value = c.action || '';
-    
-    // Reset call form
+    document.getElementById('m-nextdate').value = c.nextdate || '';
     document.getElementById('m-call-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('m-call-summary').value = '';
-    
+    document.getElementById('m-call-reaction').value = '';
+    document.getElementById('m-call-contact').value = '';
+
+    // 預設顯示歷史 tab
+    switchModalTab('history', document.querySelector('.m-tab'));
+
     document.getElementById('modal-client').classList.add('open');
     loadClientHistory(id, c.name);
   }
 
   function closeClientModal() {
     document.getElementById('modal-client').classList.remove('open');
+  }
+
+  function switchModalTab(name, el) {
+    document.querySelectorAll('.m-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.m-tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    el.classList.add('active');
+    document.getElementById('m-panel-' + name).classList.add('active');
   }
 
   function loadClientHistory(clientId, clientName) {
@@ -3491,22 +3599,26 @@ function loadClients() {
 
   function renderHistory(results) {
     var listEl = document.getElementById('m-history-list');
+    if (!results.length) { listEl.innerHTML = '<div class="empty">尚無歷史紀錄</div>'; return; }
     var html = '<div class="timeline">';
-    results.forEach(function(p){
+    results.forEach(function(p, i){
       var pr = p.properties;
-      var date = gp(pr, '拜訪日期', 'date') || '未知日期';
-      var summary = gp(pr, '會議摘要', 'text') || '(無內容)';
+      var date    = gp(pr, '拜訪日期', 'date') || '未知日期';
+      var summary = gp(pr, '會議摘要', 'text') || '（無內容）';
       var contact = gp(pr, '聯繫方式', 'select');
       var reaction = gp(pr, '客戶反應', 'select');
-      
+      var commitment = gp(pr, '承諾事項', 'text');
+      var isOld = i > 0;
       html += '<div class="timeline-item">' +
-                '<div class="tl-date">' + date + '</div>' +
-                '<div class="tl-content">' + summary + '</div>' +
-                '<div class="tl-meta">' +
-                  (contact ? '<span>方式：' + contact + '</span>' : '') +
-                  (reaction ? '<span>反應：' + reaction + '</span>' : '') +
-                '</div>' +
-              '</div>';
+        '<div class="tl-left"><div class="tl-dot' + (isOld ? ' old' : '') + '"></div><div class="tl-line"></div></div>' +
+        '<div class="tl-body">' +
+          '<div class="tl-date">' + date + (contact ? '　' + contact : '') + '</div>' +
+          '<div class="tl-content">' + summary + '</div>' +
+          '<div class="tl-meta">' +
+            (reaction ? '<span class="tl-tag">' + reaction + '</span>' : '') +
+            (commitment ? '<span class="tl-tag">承諾：' + commitment + '</span>' : '') +
+          '</div>' +
+        '</div></div>';
     });
     html += '</div>';
     listEl.innerHTML = html;
@@ -3519,14 +3631,32 @@ function loadClients() {
       '優先級': { select: { name: document.getElementById('m-priority').value } },
       '下一步行動': { rich_text: rt(document.getElementById('m-action').value) }
     };
+    var nextdate = document.getElementById('m-nextdate').value;
+    if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
     showToast('儲存中...', '');
     fetch(crmApiBase + '/api/crm/pages/' + selectedClientId, {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r){
-      if (r.ok) { showToast('主檔已更新', 'ok'); loadClients(); }
-      else { showToast('更新失敗', 'err'); }
+      if (r.ok) {
+        showToast('主檔已更新', 'ok');
+        // 更新彈窗內的下一步行動 highlight
+        var action = document.getElementById('m-action').value;
+        var naBox = document.getElementById('m-next-action-box');
+        if (action) { document.getElementById('m-next-action-text').textContent = action; naBox.style.display = ''; }
+        else { naBox.style.display = 'none'; }
+        loadClients();
+      } else { showToast('更新失敗', 'err'); }
     });
+  }
+
+  function submitBothFromModal() {
+    var summary = document.getElementById('m-call-summary').value.trim();
+    // 先更新主檔
+    submitUpdateFromModal();
+    // 有填摘要才新增拜訪記錄
+    if (!summary) { showToast('主檔已更新（未填摘要，未新增拜訪記錄）', 'ok'); return; }
+    submitCallFromModal();
   }
 
   function submitCall() {
@@ -3584,10 +3714,10 @@ function loadClients() {
     var props = {
       '拜訪主旨': { title: rt(client.name + ' — ' + date) },
       '拜訪日期': { date: { start: date } },
-      '會議摘要': { rich_text: rt(summary) },
-      '聯繫方式': { select: { name: contact } },
-      '客戶反應': { select: { name: reaction } }
+      '會議摘要': { rich_text: rt(summary) }
     };
+    if (contact) props['聯繫方式'] = { select: { name: contact } };
+    if (reaction) props['客戶反應'] = { select: { name: reaction } };
     
     showToast('送出紀錄中...', '');
     fetch(crmApiBase + '/api/crm/pages', {
