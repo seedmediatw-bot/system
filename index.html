@@ -68,6 +68,182 @@
       margin-top: 10px;
       min-height: 18px
     }
+    #system-select {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: #1a1916;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
+      gap: 12px;
+      padding: 24px
+    }
+    #system-select.hidden { display: none }
+    .sys-title {
+      color: #e8e6e0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      opacity: .6
+    }
+    .sys-cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center
+    }
+    .sys-card {
+      background: #252420;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 18px;
+      padding: 40px 44px;
+      width: 260px;
+      cursor: pointer;
+      text-align: center;
+      transition: background .18s, border-color .18s, transform .18s;
+      text-decoration: none
+    }
+    .sys-card:hover {
+      background: #2e2c28;
+      border-color: rgba(255,255,255,.2);
+      transform: translateY(-3px)
+    }
+    .sys-card-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 18px;
+      font-size: 26px
+    }
+    .sys-card-icon.hr  { background: rgba(42,92,170,.25) }
+    .sys-card-icon.crm { background: rgba(26,122,74,.25) }
+    .sys-card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px
+    }
+    .sys-card p {
+      font-size: 12px;
+      color: rgba(255,255,255,.4);
+      line-height: 1.6
+    }
+    .key-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px
+    }
+    .key-info {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+    .key-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text)
+    }
+    .key-status {
+      font-size: 12px;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-weight: 600
+    }
+    .key-status.set {
+      background: var(--success-bg);
+      color: var(--success)
+    }
+    .key-status.unset {
+      background: var(--surface2);
+      color: var(--text3)
+    }
+    .key-btns { display: flex; gap: 6px }
+    .btn.danger {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid #f5c6c6
+    }
+    .btn.danger:hover { background: #fbe0e0 }
+    .key-input-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 12px;
+      background: var(--surface2);
+      border-radius: var(--r)
+    }
+    .key-input-row input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      font-size: 13px;
+      background: var(--surface);
+      outline: none
+    }
+    .key-input-row input:focus { border-color: var(--accent) }
+    .admin-btn {
+      position: absolute;
+      bottom: 52px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.2);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      transition: color .15s;
+      font-family: inherit
+    }
+    .admin-btn:hover { color: rgba(255,255,255,.5) }
+    .admin-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9000
+    }
+    .admin-modal-overlay.hidden { display: none }
+    .admin-modal-box {
+      background: var(--surface);
+      border-radius: var(--rl);
+      padding: 24px;
+      width: 280px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2)
+    }
+    .sys-home-btn {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 20px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      cursor: pointer;
+      font-size: 12px;
+      color: rgba(255,255,255,.45);
+      font-weight: 500;
+      letter-spacing: .5px;
+      transition: color .15s;
+      background: none;
+      border-left: none;
+      border-right: none;
+      border-top: none;
+      width: 100%;
+      text-align: left;
+      font-family: inherit
+    }
+    .sys-home-btn:hover { color: rgba(255,255,255,.8) }
     *,
     *::before,
     *::after {
@@ -1127,14 +1303,45 @@
 <body>
 
   <!-- 密碼保護 -->
-  <div id="login-overlay">
+  <div id="login-overlay" class="hidden">
     <div class="login-box">
-      <h2>HR 自動化系統</h2>
+      <h2 id="login-system-name">系統</h2>
       <p>請輸入系統密碼</p>
       <input type="password" id="pw-input" maxlength="8" placeholder="••••••••"
         onkeydown="if(event.key==='Enter')doLogin()">
       <button class="login-btn" onclick="doLogin()">進入系統</button>
       <div class="login-err" id="pw-err"></div>
+      <div style="margin-top:14px">
+        <button onclick="backToSelect()" style="background:none;border:none;color:#9e9b92;font-size:12px;cursor:pointer;font-family:inherit">← 返回選擇頁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系統選擇頁 -->
+  <div id="system-select">
+    <div class="sys-title">種子創意 · 內部系統</div>
+    <div class="sys-cards">
+      <div class="sys-card" onclick="selectSystem('hr')">
+        <div class="sys-card-icon hr">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4d8de8" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <h3>HR 自動化系統</h3>
+        <p>請假申請、報帳、<br>員工管理、簽到</p>
+      </div>
+      <div class="sys-card" onclick="selectSystem('crm')">
+        <div class="sys-card-icon crm">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3db87a" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <h3>客戶關係管理</h3>
+        <p>客戶總覽、拜訪記錄、<br>AI 智慧分析</p>
+      </div>
     </div>
   </div>
 
@@ -1144,8 +1351,12 @@
   <div class="app">
 
     <aside class="sidebar">
-      <div class="logo">
-        <h1>HR 系統</h1>
+      <button class="sys-home-btn" onclick="goHome()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        返回首頁
+      </button>
+      <div class="logo" style="padding-top:56px">
+        <h1 id="sidebar-title">HR 系統</h1>
         <p>Office Automation</p>
       </div>
       <div class="sidenav">
@@ -1223,19 +1434,28 @@
           </svg>
           <span>帳號管理</span>
         </div>
-        <div class="nav-sec">設定</div>
-        <div class="nav-item" onclick="navTo('settings',this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
-          </svg>
-          <span>Notion 設定</span>
-        </div>
       </div>
       <div class="nstatus">
         <div class="ndot" id="ndot"></div><span class="nlabel" id="nlabel">未連接 Notion</span>
       </div>
+      <button class="admin-btn" onclick="openAdminLogin()" title="管理員">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      </button>
     </aside>
+
+    <!-- 管理員密碼 Modal -->
+    <div id="admin-modal" class="admin-modal-overlay hidden">
+      <div class="admin-modal-box">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text)">管理員驗證</div>
+        <input type="password" id="admin-pw" placeholder="管理員密碼" autocomplete="off"
+          onkeydown="if(event.key==='Enter')doAdminLogin()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;margin-bottom:10px;outline:none">
+        <div style="display:flex;gap:8px">
+          <button class="btn btnp" style="flex:1" onclick="doAdminLogin()">確認</button>
+          <button class="btn" onclick="closeAdminLogin()">取消</button>
+        </div>
+        <div id="admin-err" style="font-size:12px;color:var(--danger);margin-top:8px;min-height:16px"></div>
+      </div>
+    </div>
 
     <main class="main">
       <div class="topbar">
@@ -1911,33 +2131,38 @@
             <p>設定 Notion API 串接，讓申請資料自動同步到 Notion</p>
           </div>
           <div class="card">
-            <div class="ct">Integration Token</div>
-            <div class="cfgbox">
-              <h3>取得 Notion Token</h3>
-              <ol style="font-size:13px;color:var(--text2);line-height:2.2;padding-left:18px">
-                <li>前往 <a href="https://www.notion.so/my-integrations" target="_blank"
-                    style="color:var(--accent)">notion.so/my-integrations</a></li>
-                <li>點擊你建立的 Integration → Manage</li>
-                <li>在 Configuration 頁面點「Show」複製 Token（開頭為 <code
-                    style="background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11px">ntn_</code>）</li>
-                <li>到 Content access 頁面點「Edit access」→ 搜尋「HR 自動化系統」→ 儲存</li>
-              </ol>
-            </div>
-            <div class="fg" style="margin-bottom:12px">
-              <label>HR 存取密鑰（X-Access-Key）</label>
-              <div class="trwrap">
-                <input type="password" id="hr-access-key" placeholder="HR_ACCESS_KEY">
-                <span class="trtoggle" onclick="toggleTok('hr-access-key',this)">顯示</span>
+            <div class="ct">存取密鑰</div>
+            <p style="font-size:13px;color:var(--text2);margin-bottom:16px">密鑰由管理員設定於 Cloudflare Worker 環境變數，輸入後永久遮罩，無法查看。</p>
+            <div class="key-row">
+              <div class="key-info">
+                <span class="key-label">HR 存取密鑰</span>
+                <span class="key-status" id="hr-key-status"></span>
+              </div>
+              <div class="key-btns">
+                <button class="btn btnsm danger" id="hr-key-remove" onclick="removeKey('hr')">移除</button>
+                <button class="btn btnsm btnp" id="hr-key-add" onclick="showKeyInput('hr')">新增</button>
               </div>
             </div>
-            <div class="fg" style="margin-bottom:12px">
-              <label>CRM 存取密鑰（X-Access-Key）</label>
-              <div class="trwrap">
-                <input type="password" id="crm-access-key" placeholder="CRM_ACCESS_KEY">
-                <span class="trtoggle" onclick="toggleTok('crm-access-key',this)">顯示</span>
+            <div class="key-input-row" id="hr-key-input">
+              <input type="password" id="hr-key-val" placeholder="輸入 HR_ACCESS_KEY" autocomplete="off">
+              <button class="btn btnsm btnp" onclick="confirmKey('hr')">確認</button>
+              <button class="btn btnsm" onclick="cancelKeyInput('hr')">取消</button>
+            </div>
+            <div class="key-row" style="margin-top:12px">
+              <div class="key-info">
+                <span class="key-label">CRM 存取密鑰</span>
+                <span class="key-status" id="crm-key-status"></span>
+              </div>
+              <div class="key-btns">
+                <button class="btn btnsm danger" id="crm-key-remove" onclick="removeKey('crm')">移除</button>
+                <button class="btn btnsm btnp" id="crm-key-add" onclick="showKeyInput('crm')">新增</button>
               </div>
             </div>
-            <button class="btn btnp" onclick="saveToken()">儲存密鑰</button>
+            <div class="key-input-row" id="crm-key-input">
+              <input type="password" id="crm-key-val" placeholder="輸入 CRM_ACCESS_KEY" autocomplete="off">
+              <button class="btn btnsm btnp" onclick="confirmKey('crm')">確認</button>
+              <button class="btn btnsm" onclick="cancelKeyInput('crm')">取消</button>
+            </div>
           </div>
           <div class="card">
             <div class="ct">資料庫 ID（已預設）</div>
@@ -1947,14 +2172,14 @@
                 ID。</p>
             </div>
             <div class="grid2">
-              <div class="fg"><label>請假申請 Database ID</label><input type="text" id="db-leave"></div>
-              <div class="fg"><label>報帳申請 Database ID</label><input type="text" id="db-expense"></div>
-              <div class="fg"><label>員工資料庫 Database ID</label><input type="text" id="db-employees"></div>
-              <div class="fg"><label>審核記錄 Database ID</label><input type="text" id="db-approvals"></div>
-              <div class="fg"><label>員工簽到 Database ID</label><input type="text" id="db-checkin"></div>
-              <div class="fg"><label>帳號管理 Database ID</label><input type="text" id="db-accounts"></div>
-              <div class="fg"><label>CRM 客戶 Database ID</label><input type="text" id="db-crm"></div>
-              <div class="fg"><label>CRM 拜訪 Database ID</label><input type="text" id="db-call"></div>
+              <div class="fg"><label>請假申請 Database ID</label><input type="password" id="db-leave" autocomplete="off"></div>
+              <div class="fg"><label>報帳申請 Database ID</label><input type="password" id="db-expense" autocomplete="off"></div>
+              <div class="fg"><label>員工資料庫 Database ID</label><input type="password" id="db-employees" autocomplete="off"></div>
+              <div class="fg"><label>審核記錄 Database ID</label><input type="password" id="db-approvals" autocomplete="off"></div>
+              <div class="fg"><label>員工簽到 Database ID</label><input type="password" id="db-checkin" autocomplete="off"></div>
+              <div class="fg"><label>帳號管理 Database ID</label><input type="password" id="db-accounts" autocomplete="off"></div>
+              <div class="fg"><label>CRM 客戶 Database ID</label><input type="password" id="db-crm" autocomplete="off"></div>
+              <div class="fg"><label>CRM 拜訪 Database ID</label><input type="password" id="db-call" autocomplete="off"></div>
             </div>
             <div style="margin-top:14px;display:flex;gap:10px">
               <button class="btn btnp" onclick="saveDBs()">儲存設定</button>
@@ -2094,21 +2319,101 @@
 
   <script>
     // ── 密碼驗證 ───────────────────────────────────────────────
-    (function () {
-      if (sessionStorage.getItem('hr_auth') === '1') {
-        document.getElementById('login-overlay').classList.add('hidden');
+    var pendingSystem = '';
+    var SYS_NAMES = { hr: 'HR 自動化系統', crm: '客戶關係管理' };
+
+    function selectSystem(sys) {
+      pendingSystem = sys;
+      if (sessionStorage.getItem(sys + '_auth') === '1') {
+        enterSystem(sys);
+      } else {
+        document.getElementById('login-system-name').textContent = SYS_NAMES[sys] || sys;
+        document.getElementById('system-select').classList.add('hidden');
+        document.getElementById('pw-err').textContent = '';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('login-overlay').classList.remove('hidden');
+        setTimeout(function(){ document.getElementById('pw-input').focus(); }, 80);
       }
-    })();
+    }
     function doLogin() {
       var pw = document.getElementById('pw-input').value;
-      if (pw === '55306005') {
-        sessionStorage.setItem('hr_auth', '1');
-        document.getElementById('login-overlay').classList.add('hidden');
+      if (!pw) return;
+      var btn = document.querySelector('.login-btn');
+      btn.disabled = true; btn.textContent = '驗證中...';
+      document.getElementById('pw-err').textContent = '';
+      fetch(API_BASE + '/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: pendingSystem, password: pw })
+      }).then(function(r){ return r.json(); })
+      .then(function(data){
+        btn.disabled = false; btn.textContent = '進入系統';
+        if (data.ok) {
+          sessionStorage.setItem(pendingSystem + '_auth', '1');
+          if (data.accessKey) {
+            if (pendingSystem === 'hr') { hrKey = data.accessKey; localStorage.setItem('hrKey', hrKey); }
+            else { crmKey = data.accessKey; localStorage.setItem('crmKey', crmKey); }
+            updateNotionUI();
+          }
+          document.getElementById('login-overlay').classList.add('hidden');
+          enterSystem(pendingSystem);
+        } else {
+          document.getElementById('pw-err').textContent = '密碼錯誤，請再試一次';
+          document.getElementById('pw-input').value = '';
+          document.getElementById('pw-input').focus();
+        }
+      }).catch(function(){
+        btn.disabled = false; btn.textContent = '進入系統';
+        document.getElementById('pw-err').textContent = '無法連線，請確認 Worker 設定';
+      });
+    }
+    function enterSystem(sys) {
+      document.getElementById('system-select').classList.add('hidden');
+      if (sys === 'crm') {
+        document.getElementById('sidebar-title').textContent = 'CRM 系統';
+        navTo('crm-dashboard', document.querySelector('.nav-item[onclick*="crm-dashboard"]'));
       } else {
-        document.getElementById('pw-err').textContent = '密碼錯誤，請再試一次';
-        document.getElementById('pw-input').value = '';
-        document.getElementById('pw-input').focus();
+        document.getElementById('sidebar-title').textContent = 'HR 系統';
+        navTo('dashboard', document.querySelector('.nav-item[onclick*="navTo(\'dashboard\'"]'));
       }
+    }
+    function openAdminLogin() {
+      document.getElementById('admin-pw').value = '';
+      document.getElementById('admin-err').textContent = '';
+      document.getElementById('admin-modal').classList.remove('hidden');
+      setTimeout(function(){ document.getElementById('admin-pw').focus(); }, 80);
+    }
+    function closeAdminLogin() {
+      document.getElementById('admin-modal').classList.add('hidden');
+    }
+    function doAdminLogin() {
+      var pw = document.getElementById('admin-pw').value;
+      if (!pw) return;
+      fetch(API_BASE + '/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: 'admin', password: pw })
+      }).then(function(r){ return r.json(); })
+      .then(function(data){
+        if (data.ok) {
+          closeAdminLogin();
+          navTo('settings', null);
+        } else {
+          document.getElementById('admin-err').textContent = '密碼錯誤';
+          document.getElementById('admin-pw').value = '';
+          document.getElementById('admin-pw').focus();
+        }
+      }).catch(function(){
+        document.getElementById('admin-err').textContent = '連線失敗';
+      });
+    }
+    function backToSelect() {
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('system-select').classList.remove('hidden');
+    }
+    function goHome() {
+      document.getElementById('system-select').classList.remove('hidden');
+      closeSidebar();
     }
 
     // ── API 基礎網址設定 ──────────────────────────────────────
@@ -2910,13 +3215,29 @@
         '備註': { rich_text: rt(d.note) }
       };
     }
-    function saveToken() {
-      hrKey  = document.getElementById('hr-access-key').value.trim();
-      crmKey = document.getElementById('crm-access-key').value.trim();
-      localStorage.setItem('hrKey', hrKey);
-      localStorage.setItem('crmKey', crmKey);
+    function saveToken() { /* 已由 confirmKey 取代 */ }
+    function showKeyInput(type) {
+      document.getElementById(type + '-key-input').style.display = 'flex';
+      document.getElementById(type + '-key-val').focus();
+    }
+    function cancelKeyInput(type) {
+      document.getElementById(type + '-key-input').style.display = 'none';
+      document.getElementById(type + '-key-val').value = '';
+    }
+    function confirmKey(type) {
+      var val = document.getElementById(type + '-key-val').value.trim();
+      if (!val) { showToast('請輸入密鑰', 'err'); return; }
+      if (type === 'hr') { hrKey = val; localStorage.setItem('hrKey', hrKey); }
+      else               { crmKey = val; localStorage.setItem('crmKey', crmKey); }
+      cancelKeyInput(type);
       updateNotionUI();
-      showToast('存取密鑰已儲存', 'ok');
+      showToast(type.toUpperCase() + ' 密鑰已儲存', 'ok');
+    }
+    function removeKey(type) {
+      if (type === 'hr') { hrKey = ''; localStorage.removeItem('hrKey'); }
+      else               { crmKey = ''; localStorage.removeItem('crmKey'); }
+      updateNotionUI();
+      showToast(type.toUpperCase() + ' 密鑰已移除', 'ok');
     }
     function saveDBs() {
       nDBs = {
@@ -2952,15 +3273,27 @@
       document.getElementById('ndot').className = connected ? 'ndot on' : 'ndot';
       document.getElementById('nlabel').textContent = connected ? '已設定存取密鑰' : '未設定密鑰';
       document.getElementById('nstatus-detail').innerHTML = connected
-        ? '<span style="color:var(--success)">✓ 密鑰已設定</span><br><br>HR 密鑰：' + (hrKey ? '已設定' : '未設定') + '<br>CRM 密鑰：' + (crmKey ? '已設定' : '未設定') + '<br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
+        ? '<span style="color:var(--success)">✓ 密鑰已設定</span><br><br>HR 密鑰：' + (hrKey ? '已設定' : '未設定') + '<br>CRM 密鑰：' + (crmKey ? '已設定' : '未設定') + '<br><br>請假 DB：' + (nDBs.leave ? '已設定' : '未設定') + '<br>報帳 DB：' + (nDBs.expense ? '已設定' : '未設定') + '<br>簽到 DB：' + (nDBs.checkin ? '已設定' : '未設定')
         : '尚未設定存取密鑰，請填入 HR 與 CRM 密鑰。';
-      var hrEl = document.getElementById('hr-access-key'); if (hrEl) hrEl.value = hrKey;
-      var crmEl = document.getElementById('crm-access-key'); if (crmEl) crmEl.value = crmKey;
-      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts', 'crm', 'call'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
-    }
-    function toggleTok(fieldId, btn) {
-      var i = document.getElementById(fieldId);
-      if (i.type === 'password') { i.type = 'text'; btn.textContent = '隱藏'; } else { i.type = 'password'; btn.textContent = '顯示'; }
+      // 更新密鑰狀態標籤與按鈕
+      ['hr', 'crm'].forEach(function(t) {
+        var key = t === 'hr' ? hrKey : crmKey;
+        var st = document.getElementById(t + '-key-status');
+        var rm = document.getElementById(t + '-key-remove');
+        var add = document.getElementById(t + '-key-add');
+        if (!st) return;
+        if (key) {
+          st.textContent = '● 已設定'; st.className = 'key-status set';
+          rm.style.display = ''; add.textContent = '變更';
+        } else {
+          st.textContent = '○ 未設定'; st.className = 'key-status unset';
+          rm.style.display = 'none'; add.textContent = '新增';
+        }
+      });
+      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts', 'crm', 'call'].forEach(function(k) {
+        var el = document.getElementById('db-' + k);
+        if (el) el.value = nDBs[k] || '';
+      });
     }
 
     // ── 帳號管理 ────────────────────────────────────────────
