@@ -1204,29 +1204,6 @@
       .stats { grid-template-columns: 1fr }
     }
 
-    /* ── 帳號管理 ───────────────────────────────────────── */
-    .acc-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap }
-    .acc-tab {
-      padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border);
-      background: var(--surface); font-size: 13px; font-weight: 500;
-      cursor: pointer; color: var(--text2); transition: all .15s
-    }
-    .acc-tab.on { background: var(--text); color: #fff; border-color: var(--text) }
-    .acc-row {
-      display: flex; align-items: center; gap: 14px;
-      padding: 14px 0; border-bottom: 1px solid var(--border)
-    }
-    .acc-row:last-child { border-bottom: none }
-    .acc-info { flex: 1; min-width: 0 }
-    .acc-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-    .acc-user { font-size: 12px; color: var(--text2); margin-top: 2px }
-    .acc-pw { font-size: 16px; letter-spacing: 2px; color: var(--text3); font-family: monospace; flex-shrink: 0 }
-    .acc-copy { flex-shrink: 0 }
-    @media (max-width: 768px) {
-      .acc-row { gap: 10px }
-      .acc-pw { font-size: 13px }
-    }
-  
     /* --- CRM CSS --- */
     .client-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
     .client-row:last-child{border-bottom:none}
@@ -1430,14 +1407,6 @@
         </div>
         </div><!-- /nav-crm -->
 
-        <div class="nav-sec">管理</div>
-        <div class="nav-item" onclick="navTo('accounts',this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span>帳號管理</span>
-        </div>
       </div>
       <div class="nstatus">
         <div class="ndot" id="ndot"></div><span class="nlabel" id="nlabel">未連接 Notion</span>
@@ -2104,31 +2073,6 @@
 
       
         <!-- Settings -->
-        <!-- 帳號管理 -->
-        <div class="page" id="page-accounts">
-          <div class="ph">
-            <h2>帳號管理</h2>
-            <p>公司各系統帳號密碼總覽，資料即時從 Notion 讀取</p>
-          </div>
-          <div class="stats" style="grid-template-columns:repeat(3,1fr)">
-            <div class="stat"><div class="statn" id="acc-total">—</div><div class="statl">全部帳號</div></div>
-            <div class="stat"><div class="statn" id="acc-internal">—</div><div class="statl">內部系統</div></div>
-            <div class="stat"><div class="statn" id="acc-cloud">—</div><div class="statl">雲端服務</div></div>
-          </div>
-          <div class="acc-tabs" id="acc-tabs">
-            <div class="acc-tab on" onclick="filterAccounts('全部',this)">全部</div>
-            <div class="acc-tab" onclick="filterAccounts('財務費用',this)">財務費用</div>
-            <div class="acc-tab" onclick="filterAccounts('行政管理',this)">行政管理</div>
-            <div class="acc-tab" onclick="filterAccounts('其他',this)">其他</div>
-          </div>
-          <div class="card" style="padding:0 24px">
-            <div id="acc-list"><div class="empty">點選後從 Notion 載入...</div></div>
-          </div>
-          <div style="margin-top:12px;display:flex;justify-content:flex-end">
-            <button class="btn btnsm" onclick="loadAccounts()">↻ 重新整理</button>
-          </div>
-        </div>
-
         <div class="page" id="page-settings">
           <div class="ph">
             <h2>Notion 設定</h2>
@@ -2189,7 +2133,6 @@
               <div class="fg"><label>員工資料庫 Database ID</label><input type="password" id="db-employees" autocomplete="off"></div>
               <div class="fg"><label>審核記錄 Database ID</label><input type="password" id="db-approvals" autocomplete="off"></div>
               <div class="fg"><label>員工簽到 Database ID</label><input type="password" id="db-checkin" autocomplete="off"></div>
-              <div class="fg"><label>帳號管理 Database ID</label><input type="password" id="db-accounts" autocomplete="off"></div>
               <div class="fg"><label>CRM 客戶 Database ID</label><input type="password" id="db-crm" autocomplete="off"></div>
               <div class="fg"><label>CRM 拜訪 Database ID</label><input type="password" id="db-call" autocomplete="off"></div>
             </div>
@@ -2455,7 +2398,6 @@
       employees: 'b1ba6f957a114a828da1b7018949114d',
       approvals: 'f3f9a9bcc4a9447fb9623723952e33b2',
       checkin: '2c99853a8c8c477aac90d188ad2362ce',
-      accounts: '4a4198896f524cf8be6beda5e6778483',
       crm: '3568bb31aaa281bcb7b1f4550e01795c',
       call: 'd68816abcca34320b8e3fcba1029299e'
     };
@@ -2469,8 +2411,7 @@
     var aiOpen = false;
     var AVCOLS = [['#E6F1FB', '#0C447C'], ['#E1F5EE', '#085041'], ['#FAEEDA', '#633806'], ['#EEEDFE', '#3C3489'], ['#FAECE7', '#712B13'], ['#EAF3DE', '#27500A']];
     var CATS = ['交通費', '餐費', '住宿費', '材料費', '軟體訂閱', '培訓費', '其他'];
-    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', accounts:'帳號管理', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄' };
-    var ACC_DATA = [];
+    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄' };
 
     // ── Navigation ─────────────────────────────────────────
     function toggleSidebar() {
@@ -2493,7 +2434,6 @@
     if (id === 'crm-update' || id === 'crm-callreport') populateClientSelects();
       if (id === 'tracker') loadNotionData();
       if (id === 'expense') loadExpenseHistory();
-      if (id === 'accounts') loadAccounts();
       // 手機版：選完頁面後自動關閉選單
       if (window.innerWidth <= 768) closeSidebar();
     }
@@ -3270,7 +3210,6 @@
         leave: document.getElementById('db-leave').value.trim(), expense: document.getElementById('db-expense').value.trim(),
         employees: document.getElementById('db-employees').value.trim(), approvals: document.getElementById('db-approvals').value.trim(),
         checkin: document.getElementById('db-checkin').value.trim(),
-        accounts: document.getElementById('db-accounts').value.trim(),
         crm: document.getElementById('db-crm').value.trim(),
         call: document.getElementById('db-call').value.trim()
       };
@@ -3316,93 +3255,12 @@
           rm.style.display = 'none'; add.textContent = '新增';
         }
       });
-      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts', 'crm', 'call'].forEach(function(k) {
+      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'crm', 'call'].forEach(function(k) {
         var el = document.getElementById('db-' + k);
         if (el) el.value = nDBs[k] || '';
       });
       var hrApiEl = document.getElementById('inp-hr-api'); if (hrApiEl) hrApiEl.value = hrApiBase;
       var crmApiEl = document.getElementById('inp-crm-api'); if (crmApiEl) crmApiEl.value = crmApiBase;
-    }
-
-    // ── 帳號管理 ────────────────────────────────────────────
-    function loadAccounts() {
-      var list = document.getElementById('acc-list');
-      if (!nDBs.accounts) {
-        list.innerHTML = '<div class="empty">請先在「Notion 設定」填入帳號管理 Database ID</div>';
-        return;
-      }
-      list.innerHTML = '<div class="empty">載入中...</div>';
-      var body = JSON.stringify({ page_size: 100, sorts: [{ property: '名稱', direction: 'ascending' }] });
-      fetch(hrApiBase + '/api/hr/databases/' + nDBs.accounts + '/query', { method: 'POST', headers: hrH(), body: body })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (!data.results) { list.innerHTML = '<div class="empty">讀取失敗，請確認 Database ID 與 Notion 連線</div>'; return; }
-          ACC_DATA = data.results.map(function (p) {
-            var props = p.properties;
-            return {
-              id: p.id,
-              name: gp(props, '名稱', 'title'),
-              account: gp(props, '帳號', 'text'),
-              password: gp(props, '密碼', 'text'),
-              category: gp(props, '類別', 'select'),
-              sysType: gp(props, '系統類型', 'select'),
-              note: gp(props, '備註', 'text')
-            };
-          });
-          // 更新統計
-          document.getElementById('acc-total').textContent = ACC_DATA.length;
-          document.getElementById('acc-internal').textContent = ACC_DATA.filter(function (a) { return a.sysType === '內部系統'; }).length;
-          document.getElementById('acc-cloud').textContent = ACC_DATA.filter(function (a) { return a.sysType === '雲端服務'; }).length;
-          // 重設篩選 tab
-          document.querySelectorAll('.acc-tab').forEach(function (t) { t.classList.remove('on'); });
-          document.querySelector('.acc-tab').classList.add('on');
-          renderAccounts(ACC_DATA);
-        })
-        .catch(function () { list.innerHTML = '<div class="empty">網路錯誤，請稍後重試</div>'; });
-    }
-
-    function filterAccounts(cat, el) {
-      document.querySelectorAll('.acc-tab').forEach(function (t) { t.classList.remove('on'); });
-      el.classList.add('on');
-      var filtered = cat === '全部' ? ACC_DATA : ACC_DATA.filter(function (a) { return a.category === cat; });
-      renderAccounts(filtered);
-    }
-
-    function renderAccounts(list) {
-      var el = document.getElementById('acc-list');
-      if (!list.length) { el.innerHTML = '<div class="empty">此分類沒有帳號資料</div>'; return; }
-      el.innerHTML = list.map(function (a, i) {
-        var initials = (a.name || '?').replace(/[^A-Za-z0-9一-鿿]/g, '').slice(0, 2).toUpperCase();
-        var col = AVCOLS[i % AVCOLS.length];
-        var hasPw = !!a.password;
-        return '<div class="acc-row">' +
-          '<div class="av" style="background:' + col[0] + ';color:' + col[1] + '">' + initials + '</div>' +
-          '<div class="acc-info">' +
-            '<div class="acc-name">' + (a.name || '（未命名）') + (a.note ? ' <span style="font-size:11px;color:var(--text3);font-weight:400">— ' + a.note + '</span>' : '') + '</div>' +
-            '<div class="acc-user">' + (a.account || '未填帳號') + (a.sysType ? ' · <span style="color:var(--accent)">' + a.sysType + '</span>' : '') + '</div>' +
-          '</div>' +
-          '<div class="acc-pw">' + (hasPw ? '•••••••••' : '—') + '</div>' +
-          '<div class="acc-copy">' +
-            (hasPw ? '<button class="btn btnsm" onclick="copyAccPassword(\'' + a.id + '\')">複製</button>' : '<button class="btn btnsm" disabled style="opacity:.4">複製</button>') +
-          '</div>' +
-        '</div>';
-      }).join('');
-    }
-
-    function copyAccPassword(id) {
-      var acc = ACC_DATA.filter(function (a) { return a.id === id; })[0];
-      if (!acc || !acc.password) { showToast('沒有密碼資料', 'err'); return; }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(acc.password).then(function () { showToast('密碼已複製', 'ok'); }).catch(function () { fallbackCopy(acc.password); });
-      } else { fallbackCopy(acc.password); }
-    }
-
-    function fallbackCopy(text) {
-      var ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.focus(); ta.select();
-      try { document.execCommand('copy'); showToast('密碼已複製', 'ok'); } catch (e) { showToast('複製失敗，請手動複製', 'err'); }
-      document.body.removeChild(ta);
     }
 
     // ── AI ─────────────────────────────────────────────────
