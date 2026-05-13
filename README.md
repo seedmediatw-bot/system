@@ -11,14 +11,20 @@
     │  選擇系統（HR / CRM）→ 輸入密碼
     ↓
 GitHub Pages（index.html，靜態網頁）
-    │  API 請求（附 X-Access-Key）
-    ↓
-Cloudflare Worker（驗證 + API 代理，隱藏所有金鑰）
     │
-    ├─→ /api/auth     密碼驗證，回傳 Access Key
-    ├─→ /api/hr/*     HR 系統 Notion 代理
-    ├─→ /api/crm/*    CRM 系統 Notion 代理
-    └─→ /api/gemini   Gemini AI 代理
+    ├─→ HR API 請求（附 X-Access-Key）
+    │       ↓
+    │   HR Worker（shy-sun-7610）
+    │       ├─→ /api/auth     密碼驗證，回傳 HR Access Key + DB IDs
+    │       ├─→ /api/hr/*     HR 系統 Notion 代理
+    │       └─→ /api/gemini   Gemini AI 代理
+    │
+    └─→ CRM API 請求（附 X-Access-Key）
+            ↓
+        CRM Worker（round-brook-f2a3）
+            ├─→ /api/auth     密碼驗證，回傳 CRM Access Key + DB IDs
+            ├─→ /api/crm/*    CRM 系統 Notion 代理
+            └─→ /api/gemini   Gemini AI 代理
 ```
 
 ---
@@ -28,7 +34,8 @@ Cloudflare Worker（驗證 + API 代理，隱藏所有金鑰）
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | **核心檔案**，整合 HR 與 CRM 的 UI + 邏輯 |
-| `cloudflare-worker.js` | Cloudflare Worker 程式碼（部署到 Cloudflare 後才生效） |
+| `hr-worker.js` | HR 系統 Cloudflare Worker（部署到 Cloudflare 後才生效） |
+| `crm-worker.js` | CRM 系統 Cloudflare Worker（部署到 Cloudflare 後才生效） |
 | `README.md` | 本系統說明文件 |
 | `.gitignore` | 設定上傳規則 |
 
@@ -103,16 +110,33 @@ Cloudflare Worker（驗證 + API 代理，隱藏所有金鑰）
 
 ## 🔑 Cloudflare Worker 環境變數
 
+### HR Worker（hr-worker.js）
+
 | 變數 | 用途 |
 |---|---|
 | `HR_PASSWORD` | HR 系統登入密碼 |
-| `CRM_PASSWORD` | CRM 系統登入密碼 |
 | `ADMIN_PASSWORD` | 管理員設定頁密碼 |
 | `HR_ACCESS_KEY` | HR API 呼叫驗證密鑰 |
-| `CRM_ACCESS_KEY` | CRM API 呼叫驗證密鑰 |
-| `HR_TOKEN` | Notion Integration Token（HR）|
-| `CRM_TOKEN` | Notion Integration Token（CRM）|
+| `HR_TOKEN` | Notion Integration Token |
 | `GEMINI_API_KEY` | Google AI Studio API Key |
+| `DB_LEAVE` | 請假申請資料庫 ID |
+| `DB_EXPENSE` | 報帳申請資料庫 ID |
+| `DB_EMPLOYEES` | 員工資料庫 ID |
+| `DB_APPROVALS` | 審核記錄資料庫 ID |
+| `DB_CHECKIN` | 員工簽到記錄資料庫 ID |
+| `DB_ACCOUNTS` | 帳號管理資料庫 ID |
+
+### CRM Worker（crm-worker.js）
+
+| 變數 | 用途 |
+|---|---|
+| `CRM_PASSWORD` | CRM 系統登入密碼 |
+| `ADMIN_PASSWORD` | 管理員設定頁密碼 |
+| `CRM_ACCESS_KEY` | CRM API 呼叫驗證密鑰 |
+| `CRM_TOKEN` | Notion Integration Token |
+| `GEMINI_API_KEY` | Google AI Studio API Key |
+| `DB_CRM` | CRM 客戶資料庫 ID |
+| `DB_CALL` | 拜訪記錄資料庫 ID |
 
 > ⚠️ **安全性**：GitHub 上不含任何密碼或金鑰，所有敏感資訊均儲存於 Cloudflare 環境變數。
 
@@ -133,13 +157,18 @@ git clone https://github.com/seedmediatw-bot/system.git
 3. Branch 選 `main` / `/ (root)`
 4. 儲存，約 1 分鐘後上線
 
-### 3. 部署 Cloudflare Worker
+### 3. 部署 Cloudflare Worker（需部署兩個）
 
+**HR Worker**
 1. 前往 [workers.cloudflare.com](https://workers.cloudflare.com/) 登入
-2. 點「Create a Worker」
-3. 把 `cloudflare-worker.js` 的內容全部貼上，取代預設程式碼
-4. 點「Save and Deploy」
-5. 進入 Worker → Settings → Variables，新增上表所有環境變數
+2. 點「Create a Worker」→「Start with Hello World!」，命名為 `hr-worker`
+3. 進入 Edit code，把 `hr-worker.js` 內容全部貼上，Deploy
+4. 進入 Settings → Variables，新增 HR Worker 所需的所有環境變數
+
+**CRM Worker**
+1. 同上步驟，命名為 `crm-worker`
+2. 進入 Edit code，把 `crm-worker.js` 內容全部貼上，Deploy
+3. 進入 Settings → Variables，新增 CRM Worker 所需的所有環境變數
 
 ### 4. 設定 Notion Integration
 
