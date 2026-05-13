@@ -2436,10 +2436,8 @@
 
     // ── API 基礎網址設定 ──────────────────────────────────────
     // 本地伺服器（預設）：保持空字串 ''
-    // Cloudflare Worker：填入你的 Worker URL
-    //   例如：'https://hr-proxy.你的名稱.workers.dev'
-    var hrApiBase  = localStorage.getItem('hrApiBase')  || '';
-    var crmApiBase = localStorage.getItem('crmApiBase') || '';
+    var hrApiBase  = localStorage.getItem('hrApiBase')  || 'https://shy-sun-7610.seedmediatw.workers.dev';
+    var crmApiBase = localStorage.getItem('crmApiBase') || 'https://round-brook-f2a3.seedmediatw.workers.dev';
     function activeApiBase() { return pendingSystem === 'crm' ? crmApiBase : hrApiBase; }
   // --- CRM Variables ---
   var CRM_DATA = [];
