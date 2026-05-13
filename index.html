@@ -2135,6 +2135,14 @@
             <p>設定 Notion API 串接，讓申請資料自動同步到 Notion</p>
           </div>
           <div class="card">
+            <div class="ct">Worker 網址</div>
+            <div class="grid2" style="margin-bottom:14px">
+              <div class="fg"><label>HR Worker URL</label><input type="text" id="inp-hr-api" placeholder="https://hr-worker.xxx.workers.dev"></div>
+              <div class="fg"><label>CRM Worker URL</label><input type="text" id="inp-crm-api" placeholder="https://crm-worker.xxx.workers.dev"></div>
+            </div>
+            <button class="btn btnp" onclick="saveApiBase()">儲存 Worker 網址</button>
+          </div>
+          <div class="card">
             <div class="ct">存取密鑰</div>
             <p style="font-size:13px;color:var(--text2);margin-bottom:16px">密鑰由管理員設定於 Cloudflare Worker 環境變數，輸入後永久遮罩，無法查看。</p>
             <div class="key-row">
@@ -2345,7 +2353,7 @@
       var btn = document.querySelector('.login-btn');
       btn.disabled = true; btn.textContent = '驗證中...';
       document.getElementById('pw-err').textContent = '';
-      fetch(API_BASE + '/api/auth', {
+      fetch(activeApiBase() + '/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ system: pendingSystem, password: pw })
@@ -2357,8 +2365,12 @@
           if (data.accessKey) {
             if (pendingSystem === 'hr') { hrKey = data.accessKey; localStorage.setItem('hrKey', hrKey); }
             else { crmKey = data.accessKey; localStorage.setItem('crmKey', crmKey); }
-            updateNotionUI();
           }
+          if (data.dbIds) {
+            Object.keys(data.dbIds).forEach(function(k){ if (data.dbIds[k]) nDBs[k] = data.dbIds[k]; });
+            localStorage.setItem('nDBs', JSON.stringify(nDBs));
+          }
+          updateNotionUI();
           document.getElementById('login-overlay').classList.add('hidden');
           enterSystem(pendingSystem);
         } else {
@@ -2395,7 +2407,7 @@
     function doAdminLogin() {
       var pw = document.getElementById('admin-pw').value;
       if (!pw) return;
-      fetch(API_BASE + '/api/auth', {
+      fetch(activeApiBase() + '/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ system: 'admin', password: pw })
@@ -2426,7 +2438,9 @@
     // 本地伺服器（預設）：保持空字串 ''
     // Cloudflare Worker：填入你的 Worker URL
     //   例如：'https://hr-proxy.你的名稱.workers.dev'
-    var API_BASE = 'https://shy-sun-7610.seedmediatw.workers.dev';
+    var hrApiBase  = localStorage.getItem('hrApiBase')  || '';
+    var crmApiBase = localStorage.getItem('crmApiBase') || '';
+    function activeApiBase() { return pendingSystem === 'crm' ? crmApiBase : hrApiBase; }
   // --- CRM Variables ---
   var CRM_DATA = [];
   var selectedClientId = '';
@@ -2609,7 +2623,7 @@
         return new Promise(function(resolve){
           var reader = new FileReader();
           reader.onload = function(e){
-            fetch(API_BASE + '/api/hr/drive-upload', {
+            fetch(hrApiBase + '/api/hr/drive-upload', {
               method: 'POST',
               headers: hrH(),
               body: JSON.stringify({ base64: e.target.result.split(',')[1], mimeType: file.type || 'image/jpeg', filename: file.name || ('receipt-' + (i+1) + '.jpg') })
@@ -2648,7 +2662,7 @@
         var list = document.getElementById('expense-history-list');
         if (!list || !hrKey || !nDBs.expense) return;
         
-        fetch(API_BASE + '/api/hr/databases/' + nDBs.expense + '/query', {
+        fetch(hrApiBase + '/api/hr/databases/' + nDBs.expense + '/query', {
             method: 'POST',
             headers: hrH(),
             body: JSON.stringify({ page_size: 10, sorts: [{ timestamp: 'created_time', direction: 'descending' }] })
@@ -2794,7 +2808,7 @@
           return { inlineData: { mimeType: img.mimeType, data: img.data } };
         });
         parts.push({ text: '請辨識這' + images.length + '張發票或收據。這可能是台灣統一發票（只有 QR Code 和總金額）或一般收據（有明細）。\n處理規則：\n1. 若是台灣統一發票：請嘗試讀取 QR Code 取得日期與金額；若 QR Code 無法讀取，則從畫面上的數字取得總金額與日期；描述填「發票消費」或店家名稱（若可見）。\n2. 若是一般收據：依明細各自列一筆，填入品項名稱、類別、日期、金額。\n3. 若一張發票有多筆可辨識明細就拆成多筆；若只有總金額就填一筆。\n只回傳 JSON 陣列，不要其他文字，格式：[{"desc":"費用說明","cat":"類別","date":"YYYY-MM-DD","amount":數字},...]。類別只能是：' + CATS.join('、') + '。日期若無法辨識請填今天：' + new Date().toISOString().split('T')[0] + '。' });
-        return fetch(API_BASE + '/api/gemini', {
+        return fetch(activeApiBase() + '/api/gemini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: parts }] })
@@ -2910,9 +2924,9 @@
       var body = JSON.stringify({ page_size: 100, sorts: [{ timestamp: 'created_time', direction: 'descending' }] });
       var thisMonth = new Date().toISOString().slice(0, 7);
       Promise.all([
-        fetch(API_BASE + '/api/hr/databases/' + nDBs.leave    + '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); }),
-        fetch(API_BASE + '/api/hr/databases/' + nDBs.expense  + '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); }),
-        fetch(API_BASE + '/api/hr/databases/' + nDBs.employees+ '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); })
+        fetch(hrApiBase + '/api/hr/databases/' + nDBs.leave    + '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); }),
+        fetch(hrApiBase + '/api/hr/databases/' + nDBs.expense  + '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); }),
+        fetch(hrApiBase + '/api/hr/databases/' + nDBs.employees+ '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); })
       ]).then(function(res) {
         var leaves   = res[0].results || [];
         var expenses = res[1].results || [];
@@ -2979,8 +2993,8 @@
       document.getElementById('trk-list').innerHTML = '<div class="card"><div class="empty">從 Notion 載入中...</div></div>';
       var body = JSON.stringify({ page_size: 100, sorts: [{ timestamp: 'created_time', direction: 'descending' }] });
       Promise.all([
-        fetch(API_BASE + '/api/hr/databases/' + nDBs.leave + '/query', { method: 'POST', headers: hrH(), body: body }).then(function (r) { return r.json(); }),
-        fetch(API_BASE + '/api/hr/databases/' + nDBs.expense + '/query', { method: 'POST', headers: hrH(), body: body }).then(function (r) { return r.json(); })
+        fetch(hrApiBase + '/api/hr/databases/' + nDBs.leave + '/query', { method: 'POST', headers: hrH(), body: body }).then(function (r) { return r.json(); }),
+        fetch(hrApiBase + '/api/hr/databases/' + nDBs.expense + '/query', { method: 'POST', headers: hrH(), body: body }).then(function (r) { return r.json(); })
       ]).then(function (res) {
         RECORDS = [];
         var leaveResults = res[0].results || [];
@@ -3073,7 +3087,7 @@
         list.innerHTML = '<div class="empty">正在從 Notion 抓取附件...</div>';
         modal.classList.add('open');
         
-        fetch(API_BASE + '/api/hr/blocks/' + nid + '/children', {
+        fetch(hrApiBase + '/api/hr/blocks/' + nid + '/children', {
             headers: { 'X-Access-Key': hrKey }
         }).then(function(r){ return r.json(); })
         .then(function(data){
@@ -3101,7 +3115,7 @@
     // ── 審核動作 ───────────────────────────────────────────
     function _patchStatus(nid, newStatus) {
       showToast('更新中...', '');
-      fetch(API_BASE + '/api/hr/pages/' + nid, {
+      fetch(hrApiBase + '/api/hr/pages/' + nid, {
         method: 'PATCH',
         headers: hrH(),
         body: JSON.stringify({ properties: { '審核狀態': { select: { name: newStatus } } } })
@@ -3134,7 +3148,7 @@
       var blocks = imageUrls.map(function(url){
         return { object:'block', type:'image', image:{ type:'external', external:{ url: url } } };
       });
-      fetch(API_BASE + '/api/hr/blocks/' + pageId + '/children', {
+      fetch(hrApiBase + '/api/hr/blocks/' + pageId + '/children', {
         method: 'PATCH',
         headers: hrH(),
         body: JSON.stringify({ children: blocks })
@@ -3157,7 +3171,7 @@
       else if (type === 'checkin') props = buildCheckinProps(data);
       else props = buildOnboardingProps(data);
 
-      fetch(API_BASE + '/api/hr/pages', {
+      fetch(hrApiBase + '/api/hr/pages', {
         method: 'POST',
         headers: hrH(),
         body: JSON.stringify({ parent: { database_id: dbId }, properties: props })
@@ -3222,6 +3236,14 @@
       };
     }
     function saveToken() { /* 已由 confirmKey 取代 */ }
+    function saveApiBase() {
+      hrApiBase  = document.getElementById('inp-hr-api').value.trim().replace(/\/$/, '');
+      crmApiBase = document.getElementById('inp-crm-api').value.trim().replace(/\/$/, '');
+      localStorage.setItem('hrApiBase', hrApiBase);
+      localStorage.setItem('crmApiBase', crmApiBase);
+      updateNotionUI();
+      showToast('Worker 網址已儲存', 'ok');
+    }
     function showKeyInput(type) {
       document.getElementById(type + '-key-input').style.display = 'flex';
       document.getElementById(type + '-key-val').focus();
@@ -3261,7 +3283,7 @@
     function testNotion() {
       if (!hrKey && !crmKey) { showToast('請先填入 HR 或 CRM 存取密鑰', 'err'); return; }
       showToast('測試中...', '');
-      fetch(API_BASE + '/api/status')
+      fetch(hrApiBase + '/api/status')
         .then(function (r) { return r.json(); })
         .then(function (s) {
           if (s.ok) {
@@ -3300,6 +3322,8 @@
         var el = document.getElementById('db-' + k);
         if (el) el.value = nDBs[k] || '';
       });
+      var hrApiEl = document.getElementById('inp-hr-api'); if (hrApiEl) hrApiEl.value = hrApiBase;
+      var crmApiEl = document.getElementById('inp-crm-api'); if (crmApiEl) crmApiEl.value = crmApiBase;
     }
 
     // ── 帳號管理 ────────────────────────────────────────────
@@ -3311,7 +3335,7 @@
       }
       list.innerHTML = '<div class="empty">載入中...</div>';
       var body = JSON.stringify({ page_size: 100, sorts: [{ property: '名稱', direction: 'ascending' }] });
-      fetch(API_BASE + '/api/hr/databases/' + nDBs.accounts + '/query', { method: 'POST', headers: hrH(), body: body })
+      fetch(hrApiBase + '/api/hr/databases/' + nDBs.accounts + '/query', { method: 'POST', headers: hrH(), body: body })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data.results) { list.innerHTML = '<div class="empty">讀取失敗，請確認 Database ID 與 Notion 連線</div>'; return; }
@@ -3400,7 +3424,7 @@
       if (!text) return; inp.value = ''; addAIMsg('user', text);
       var loading = document.createElement('div'); loading.className = 'aimsg bot'; loading.textContent = '思考中...';
       document.getElementById('aimsgs').appendChild(loading);
-      fetch(API_BASE + '/api/gemini', {
+      fetch(activeApiBase() + '/api/gemini', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'gemini-2.5-flash',
@@ -3428,7 +3452,7 @@ function loadClients() {
         return;
     }
     var body = JSON.stringify({ page_size: 100, sorts: [{ property: '客戶名稱', direction: 'ascending' }] });
-    fetch(API_BASE + '/api/crm/databases/' + nDBs.crm + '/query', {
+    fetch(crmApiBase + '/api/crm/databases/' + nDBs.crm + '/query', {
         method: 'POST',
         headers: crmH(),
         body: body
@@ -3535,7 +3559,7 @@ function loadClients() {
     var filter = { property: '拜訪主旨', title: { contains: clientName } };
     var body = JSON.stringify({ filter: filter, sorts: [{ property: '拜訪日期', direction: 'descending' }] });
     
-    fetch(API_BASE + '/api/crm/databases/' + nDBs.call + '/query', {
+    fetch(crmApiBase + '/api/crm/databases/' + nDBs.call + '/query', {
       method: 'POST', headers: crmH(),
       body: body
     }).then(function(r){ return r.json(); })
@@ -3581,7 +3605,7 @@ function loadClients() {
       '下一步行動': { rich_text: rt(document.getElementById('m-action').value) }
     };
     showToast('儲存中...', '');
-    fetch(API_BASE + '/api/crm/pages/' + selectedClientId, {
+    fetch(crmApiBase + '/api/crm/pages/' + selectedClientId, {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r){
@@ -3614,7 +3638,7 @@ function loadClients() {
     if (action) props['下一步行動'] = { rich_text: rt(action) };
     if (nextdate) props['下次跟進日期'] = { date: { start: nextdate } };
     showToast('送出中...', '');
-    fetch(API_BASE + '/api/crm/pages', {
+    fetch(crmApiBase + '/api/crm/pages', {
       method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     }).then(function(r){
@@ -3651,7 +3675,7 @@ function loadClients() {
     };
     
     showToast('送出紀錄中...', '');
-    fetch(API_BASE + '/api/crm/pages', {
+    fetch(crmApiBase + '/api/crm/pages', {
       method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     }).then(function(r){
@@ -3811,7 +3835,7 @@ function loadClients() {
 
     filesToParts(prefix).then(function(imgParts){
       var parts = imgParts.concat([{ text: AI_PROMPT + (text.trim() || '（請從圖片中擷取所有客戶相關資訊）') }]);
-      return fetch(API_BASE + '/api/gemini', {
+      return fetch(activeApiBase() + '/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: parts }] })
@@ -3871,7 +3895,7 @@ function loadClients() {
     if (!name) { showToast('請填入客戶名稱', 'err'); return; }
     var props = buildCRMProps('add', name);
     showToast('送出中...', '');
-    fetch(API_BASE + '/api/crm/pages', {
+    fetch(crmApiBase + '/api/crm/pages', {
       method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.crm }, properties: props })
     })
@@ -3897,7 +3921,7 @@ function loadClients() {
     if (!selectedClientId) { showToast('請先選擇客戶', 'err'); return; }
     var props = buildCRMProps('update', null);
     showToast('更新中...', '');
-    fetch(API_BASE + '/api/crm/pages/' + selectedClientId, {
+    fetch(crmApiBase + '/api/crm/pages/' + selectedClientId, {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     })
@@ -3944,7 +3968,7 @@ function loadClients() {
       '會議摘要': { rich_text: rt(notes) },
       '聯繫方式': { select: { name: '見面' } }
     };
-    fetch(API_BASE + '/api/crm/pages', {
+    fetch(crmApiBase + '/api/crm/pages', {
       method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     });
@@ -3961,7 +3985,7 @@ function loadClients() {
         props['下次跟進日期'] = { date: { start: d.nextdate } };
         props['下次跟進提醒日'] = { date: { start: d.nextdate } };
     }
-    fetch(API_BASE + '/api/crm/pages/' + clientId, {
+    fetch(crmApiBase + '/api/crm/pages/' + clientId, {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r) {
@@ -3987,7 +4011,7 @@ function loadClients() {
   
   // ── Init ────────────────────────────────────────────────
     // 檢查 Worker 狀態
-    fetch(API_BASE + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
+    fetch(hrApiBase + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
       if (s.ok) {
         document.getElementById('ndot').className = 'ndot on';
         document.getElementById('nlabel').textContent = '已連接 Worker';

@@ -5,3 +5,5 @@
 !index.html
 !README.md
 !.gitignore
+!hr-worker.js
+!crm-worker.js
