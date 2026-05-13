@@ -1924,13 +1924,20 @@
               </ol>
             </div>
             <div class="fg" style="margin-bottom:12px">
-              <label>Integration Token</label>
+              <label>HR 存取密鑰（X-Access-Key）</label>
               <div class="trwrap">
-                <input type="password" id="notion-token" placeholder="ntn_xxxxxxxxxxxx">
-                <span class="trtoggle" onclick="toggleTok()">顯示</span>
+                <input type="password" id="hr-access-key" placeholder="HR_ACCESS_KEY">
+                <span class="trtoggle" onclick="toggleTok('hr-access-key',this)">顯示</span>
               </div>
             </div>
-            <button class="btn btnp" onclick="saveToken()">儲存 Token</button>
+            <div class="fg" style="margin-bottom:12px">
+              <label>CRM 存取密鑰（X-Access-Key）</label>
+              <div class="trwrap">
+                <input type="password" id="crm-access-key" placeholder="CRM_ACCESS_KEY">
+                <span class="trtoggle" onclick="toggleTok('crm-access-key',this)">顯示</span>
+              </div>
+            </div>
+            <button class="btn btnp" onclick="saveToken()">儲存密鑰</button>
           </div>
           <div class="card">
             <div class="ct">資料庫 ID（已預設）</div>
@@ -2115,7 +2122,10 @@
 
 
     // ── State ──────────────────────────────────────────────
-    var nToken = localStorage.getItem('nToken') || '';
+    var hrKey  = localStorage.getItem('hrKey')  || '';
+    var crmKey = localStorage.getItem('crmKey') || '';
+    function hrH()  { return { 'Content-Type': 'application/json', 'X-Access-Key': hrKey };  }
+    function crmH() { return { 'Content-Type': 'application/json', 'X-Access-Key': crmKey }; }
     var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {
       leave: '6846115f39e341a69c8c771f5e229c7c',
       expense: '2f1e0e588b6a47c1b89d1392eca5272f',
@@ -2288,9 +2298,9 @@
         return new Promise(function(resolve){
           var reader = new FileReader();
           reader.onload = function(e){
-            fetch(API_BASE + '/api/drive-upload', {
+            fetch(API_BASE + '/api/hr/drive-upload', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: hrH(),
               body: JSON.stringify({ base64: e.target.result.split(',')[1], mimeType: file.type || 'image/jpeg', filename: file.name || ('receipt-' + (i+1) + '.jpg') })
             }).then(function(r){
               if (!r.ok) return r.text().then(function(t){ showToast('圖片上傳失敗：' + t.slice(0,80), 'err'); resolve(null); });
@@ -2325,11 +2335,11 @@
 
     function loadExpenseHistory() {
         var list = document.getElementById('expense-history-list');
-        if (!list || !nToken || !nDBs.expense) return;
+        if (!list || !hrKey || !nDBs.expense) return;
         
-        fetch(API_BASE + '/api/notion/databases/' + nDBs.expense + '/query', {
+        fetch(API_BASE + '/api/hr/databases/' + nDBs.expense + '/query', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+            headers: hrH(),
             body: JSON.stringify({ page_size: 10, sorts: [{ timestamp: 'created_time', direction: 'descending' }] })
         }).then(function(r){ return r.json(); })
         .then(function(data){
@@ -2586,13 +2596,12 @@
     function loadDashboard() {
       ['s-pending','s-approved','s-emp','s-expense'].forEach(function(id){ document.getElementById(id).textContent = '…'; });
       document.getElementById('dash-recent').innerHTML = '<div class="empty">載入中...</div>';
-      var headers = { 'Content-Type': 'application/json', 'x-notion-token': nToken };
       var body = JSON.stringify({ page_size: 100, sorts: [{ timestamp: 'created_time', direction: 'descending' }] });
       var thisMonth = new Date().toISOString().slice(0, 7);
       Promise.all([
-        fetch(API_BASE + '/api/notion/databases/' + nDBs.leave    + '/query', { method:'POST', headers:headers, body:body }).then(function(r){ return r.json(); }),
-        fetch(API_BASE + '/api/notion/databases/' + nDBs.expense  + '/query', { method:'POST', headers:headers, body:body }).then(function(r){ return r.json(); }),
-        fetch(API_BASE + '/api/notion/databases/' + nDBs.employees+ '/query', { method:'POST', headers:headers, body:body }).then(function(r){ return r.json(); })
+        fetch(API_BASE + '/api/hr/databases/' + nDBs.leave    + '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); }),
+        fetch(API_BASE + '/api/hr/databases/' + nDBs.expense  + '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); }),
+        fetch(API_BASE + '/api/hr/databases/' + nDBs.employees+ '/query', { method:'POST', headers:hrH(), body:body }).then(function(r){ return r.json(); })
       ]).then(function(res) {
         var leaves   = res[0].results || [];
         var expenses = res[1].results || [];
@@ -2657,11 +2666,10 @@
     }
     function loadNotionData() {
       document.getElementById('trk-list').innerHTML = '<div class="card"><div class="empty">從 Notion 載入中...</div></div>';
-      var headers = { 'Content-Type': 'application/json', 'x-notion-token': nToken };
       var body = JSON.stringify({ page_size: 100, sorts: [{ timestamp: 'created_time', direction: 'descending' }] });
       Promise.all([
-        fetch(API_BASE + '/api/notion/databases/' + nDBs.leave + '/query', { method: 'POST', headers: headers, body: body }).then(function (r) { return r.json(); }),
-        fetch(API_BASE + '/api/notion/databases/' + nDBs.expense + '/query', { method: 'POST', headers: headers, body: body }).then(function (r) { return r.json(); })
+        fetch(API_BASE + '/api/hr/databases/' + nDBs.leave + '/query', { method: 'POST', headers: hrH(), body: body }).then(function (r) { return r.json(); }),
+        fetch(API_BASE + '/api/hr/databases/' + nDBs.expense + '/query', { method: 'POST', headers: hrH(), body: body }).then(function (r) { return r.json(); })
       ]).then(function (res) {
         RECORDS = [];
         var leaveResults = res[0].results || [];
@@ -2754,8 +2762,8 @@
         list.innerHTML = '<div class="empty">正在從 Notion 抓取附件...</div>';
         modal.classList.add('open');
         
-        fetch(API_BASE + '/api/notion/blocks/' + nid + '/children', {
-            headers: { 'x-notion-token': nToken }
+        fetch(API_BASE + '/api/hr/blocks/' + nid + '/children', {
+            headers: { 'X-Access-Key': hrKey }
         }).then(function(r){ return r.json(); })
         .then(function(data){
             var allBlocks = data.results || [];
@@ -2782,9 +2790,9 @@
     // ── 審核動作 ───────────────────────────────────────────
     function _patchStatus(nid, newStatus) {
       showToast('更新中...', '');
-      fetch(API_BASE + '/api/notion/pages/' + nid, {
+      fetch(API_BASE + '/api/hr/pages/' + nid, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+        headers: hrH(),
         body: JSON.stringify({ properties: { '審核狀態': { select: { name: newStatus } } } })
       }).then(function(res) {
         if (!res.ok) throw new Error();
@@ -2815,9 +2823,9 @@
       var blocks = imageUrls.map(function(url){
         return { object:'block', type:'image', image:{ type:'external', external:{ url: url } } };
       });
-      fetch(API_BASE + '/api/notion/blocks/' + pageId + '/children', {
+      fetch(API_BASE + '/api/hr/blocks/' + pageId + '/children', {
         method: 'PATCH',
-        headers: { 'Content-Type':'application/json', 'x-notion-token': nToken },
+        headers: hrH(),
         body: JSON.stringify({ children: blocks })
       }).then(function(r){
         if (!r.ok) return r.text().then(function(t){ showToast('附加圖片失敗：' + t.slice(0,60), 'err'); });
@@ -2826,9 +2834,9 @@
     }
     function pushNotion(type, data, fileIds) {
       var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
-      if (!nToken || !dbId) {
-        showToast('請先設定 Notion Token 和 Database ID', 'err');
-        addAIMsg('bot', '請到左側「Notion 設定」頁面填入 Token 和 Database ID。');
+      if (!hrKey || !dbId) {
+        showToast('請先設定 HR 存取密鑰與 Database ID', 'err');
+        addAIMsg('bot', '請到左側「Notion 設定」頁面填入 HR 存取密鑰和 Database ID。');
         return;
       }
       showToast('送出中...', '');
@@ -2837,12 +2845,10 @@
       else if (type === 'expense') props = buildExpenseProps(data, fileIds);
       else if (type === 'checkin') props = buildCheckinProps(data);
       else props = buildOnboardingProps(data);
-      
-      console.log('Pushing to Notion:', { type: type, data: data, props: props });
-      
-      fetch(API_BASE + '/api/notion/pages', {
+
+      fetch(API_BASE + '/api/hr/pages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+        headers: hrH(),
         body: JSON.stringify({ parent: { database_id: dbId }, properties: props })
       }).then(function (res) {
         if (res.ok) {
@@ -2905,10 +2911,12 @@
       };
     }
     function saveToken() {
-      nToken = document.getElementById('notion-token').value.trim();
-      localStorage.setItem('nToken', nToken);
+      hrKey  = document.getElementById('hr-access-key').value.trim();
+      crmKey = document.getElementById('crm-access-key').value.trim();
+      localStorage.setItem('hrKey', hrKey);
+      localStorage.setItem('crmKey', crmKey);
       updateNotionUI();
-      showToast('Token 已儲存', 'ok');
+      showToast('存取密鑰已儲存', 'ok');
     }
     function saveDBs() {
       nDBs = {
@@ -2924,36 +2932,35 @@
       showToast('設定已儲存', 'ok');
     }
     function testNotion() {
-      if (!nToken) { showToast('請先輸入 Token', 'err'); return; }
+      if (!hrKey && !crmKey) { showToast('請先填入 HR 或 CRM 存取密鑰', 'err'); return; }
       showToast('測試中...', '');
-      fetch(API_BASE + '/api/notion/users/me', { headers: { 'x-notion-token': nToken } })
-        .then(function (r) {
-          if (r.ok) {
-            showToast('連線成功！', 'ok');
+      fetch(API_BASE + '/api/status')
+        .then(function (r) { return r.json(); })
+        .then(function (s) {
+          if (s.ok) {
+            showToast('Worker 連線正常！HR:' + (s.hr ? '✓' : '✗') + ' CRM:' + (s.crm ? '✓' : '✗'), 'ok');
             document.getElementById('ndot').className = 'ndot on';
-            document.getElementById('nlabel').textContent = '已連接 Notion';
+            document.getElementById('nlabel').textContent = '已連接 Worker';
           } else {
-            r.json().then(function (err) {
-              showToast('連線失敗：' + (err.error || err.message || '請確認 Token'), 'err');
-            }).catch(function () {
-              showToast('連線失敗 (HTTP ' + r.status + ')', 'err');
-            });
+            showToast('Worker 回應異常', 'err');
           }
         })
         .catch(function (e) { showToast('連線失敗：無法接觸伺服器', 'err'); console.error(e); });
     }
     function updateNotionUI() {
-      document.getElementById('ndot').className = nToken ? 'ndot on' : 'ndot';
-      document.getElementById('nlabel').textContent = nToken ? '已設定 Token' : '未連接 Notion';
-      document.getElementById('nstatus-detail').innerHTML = nToken
-        ? '<span style="color:var(--success)">✓ Token 已設定</span><br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
-        : '尚未設定 Notion Token。';
-      if (nToken) document.getElementById('notion-token').value = nToken;
+      var connected = !!(hrKey || crmKey);
+      document.getElementById('ndot').className = connected ? 'ndot on' : 'ndot';
+      document.getElementById('nlabel').textContent = connected ? '已設定存取密鑰' : '未設定密鑰';
+      document.getElementById('nstatus-detail').innerHTML = connected
+        ? '<span style="color:var(--success)">✓ 密鑰已設定</span><br><br>HR 密鑰：' + (hrKey ? '已設定' : '未設定') + '<br>CRM 密鑰：' + (crmKey ? '已設定' : '未設定') + '<br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定')
+        : '尚未設定存取密鑰，請填入 HR 與 CRM 密鑰。';
+      var hrEl = document.getElementById('hr-access-key'); if (hrEl) hrEl.value = hrKey;
+      var crmEl = document.getElementById('crm-access-key'); if (crmEl) crmEl.value = crmKey;
       ['leave', 'expense', 'employees', 'approvals', 'checkin', 'accounts', 'crm', 'call'].forEach(function (k) { var el = document.getElementById('db-' + k); if (el) el.value = nDBs[k] || ''; });
     }
-    function toggleTok() {
-      var i = document.getElementById('notion-token'), b = document.querySelector('.trtoggle');
-      if (i.type === 'password') { i.type = 'text'; b.textContent = '隱藏'; } else { i.type = 'password'; b.textContent = '顯示'; }
+    function toggleTok(fieldId, btn) {
+      var i = document.getElementById(fieldId);
+      if (i.type === 'password') { i.type = 'text'; btn.textContent = '隱藏'; } else { i.type = 'password'; btn.textContent = '顯示'; }
     }
 
     // ── 帳號管理 ────────────────────────────────────────────
@@ -2964,9 +2971,8 @@
         return;
       }
       list.innerHTML = '<div class="empty">載入中...</div>';
-      var headers = { 'Content-Type': 'application/json', 'x-notion-token': nToken };
       var body = JSON.stringify({ page_size: 100, sorts: [{ property: '名稱', direction: 'ascending' }] });
-      fetch(API_BASE + '/api/notion/databases/' + nDBs.accounts + '/query', { method: 'POST', headers: headers, body: body })
+      fetch(API_BASE + '/api/hr/databases/' + nDBs.accounts + '/query', { method: 'POST', headers: hrH(), body: body })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data.results) { list.innerHTML = '<div class="empty">讀取失敗，請確認 Database ID 與 Notion 連線</div>'; return; }
@@ -3078,15 +3084,15 @@
 function loadClients() {
     var el = document.getElementById('client-list');
     el.innerHTML = '<div class="empty">載入中...</div>';
-    if (!nToken || !nDBs.crm) { 
-        el.innerHTML = '<div class="empty">請先到「Notion 設定」填入 Token 與 CRM 資料庫 ID 並儲存</div>'; 
-        return; 
+    if (!crmKey || !nDBs.crm) {
+        el.innerHTML = '<div class="empty">請先到「Notion 設定」填入 CRM 存取密鑰與 CRM 資料庫 ID 並儲存</div>';
+        return;
     }
     var body = JSON.stringify({ page_size: 100, sorts: [{ property: '客戶名稱', direction: 'ascending' }] });
-    fetch(API_BASE + '/api/notion/databases/' + nDBs.crm + '/query', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken }, 
-        body: body 
+    fetch(API_BASE + '/api/crm/databases/' + nDBs.crm + '/query', {
+        method: 'POST',
+        headers: crmH(),
+        body: body
     })
       .then(function(r){ 
           if(!r.ok) throw new Error('API Error ' + r.status);
@@ -3190,8 +3196,8 @@ function loadClients() {
     var filter = { property: '拜訪主旨', title: { contains: clientName } };
     var body = JSON.stringify({ filter: filter, sorts: [{ property: '拜訪日期', direction: 'descending' }] });
     
-    fetch(API_BASE + '/api/notion/databases/' + nDBs.call + '/query', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/databases/' + nDBs.call + '/query', {
+      method: 'POST', headers: crmH(),
       body: body
     }).then(function(r){ return r.json(); })
       .then(function(data){
@@ -3236,8 +3242,8 @@ function loadClients() {
       '下一步行動': { rich_text: rt(document.getElementById('m-action').value) }
     };
     showToast('儲存中...', '');
-    fetch(API_BASE + '/api/notion/pages/' + selectedClientId, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages/' + selectedClientId, {
+      method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r){
       if (r.ok) { showToast('主檔已更新', 'ok'); loadClients(); }
@@ -3269,8 +3275,8 @@ function loadClients() {
     if (action) props['下一步行動'] = { rich_text: rt(action) };
     if (nextdate) props['下次跟進日期'] = { date: { start: nextdate } };
     showToast('送出中...', '');
-    fetch(API_BASE + '/api/notion/pages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages', {
+      method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     }).then(function(r){
       if (r.ok) { showToast('拜訪記錄已新增！', 'ok'); resetCall(); }
@@ -3306,8 +3312,8 @@ function loadClients() {
     };
     
     showToast('送出紀錄中...', '');
-    fetch(API_BASE + '/api/notion/pages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages', {
+      method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     }).then(function(r){
       if (r.ok) {
@@ -3526,8 +3532,8 @@ function loadClients() {
     if (!name) { showToast('請填入客戶名稱', 'err'); return; }
     var props = buildCRMProps('add', name);
     showToast('送出中...', '');
-    fetch(API_BASE + '/api/notion/pages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages', {
+      method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.crm }, properties: props })
     })
     .then(function(r){
@@ -3552,8 +3558,8 @@ function loadClients() {
     if (!selectedClientId) { showToast('請先選擇客戶', 'err'); return; }
     var props = buildCRMProps('update', null);
     showToast('更新中...', '');
-    fetch(API_BASE + '/api/notion/pages/' + selectedClientId, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages/' + selectedClientId, {
+      method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     })
     .then(function(r){
@@ -3599,8 +3605,8 @@ function loadClients() {
       '會議摘要': { rich_text: rt(notes) },
       '聯繫方式': { select: { name: '見面' } }
     };
-    fetch(API_BASE + '/api/notion/pages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages', {
+      method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     });
   }
@@ -3616,11 +3622,11 @@ function loadClients() {
         props['下次跟進日期'] = { date: { start: d.nextdate } };
         props['下次跟進提醒日'] = { date: { start: d.nextdate } };
     }
-    fetch(API_BASE + '/api/notion/pages/' + clientId, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-notion-token': nToken },
+    fetch(API_BASE + '/api/crm/pages/' + clientId, {
+      method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r) {
-        if (r.ok) loadClients(); // 重新整理列表
+        if (r.ok) loadClients();
     });
   }
 
@@ -3641,17 +3647,11 @@ function loadClients() {
   // ── 設定 ───────────────────────────────────────────────────
   
   // ── Init ────────────────────────────────────────────────
-    // 檢查代理伺服器是否運行中
+    // 檢查 Worker 狀態
     fetch(API_BASE + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
-      if (s.notion) {
-        // 伺服器端已有 token，自動設定客戶端旗標讓表單可以送出
-        if (!nToken) {
-          nToken = '__server__';
-          localStorage.setItem('nToken', nToken);
-        }
+      if (s.ok) {
         document.getElementById('ndot').className = 'ndot on';
-        document.getElementById('nlabel').textContent = '已連接 Notion';
-        document.getElementById('nstatus-detail').innerHTML = '<span style="color:var(--success)">✓ 伺服器 Token 已設定</span><br><br>請假 DB：' + (nDBs.leave || '未設定') + '<br>報帳 DB：' + (nDBs.expense || '未設定') + '<br>簽到 DB：' + (nDBs.checkin || '未設定');
+        document.getElementById('nlabel').textContent = '已連接 Worker';
       }
     }).catch(function () { });
     updateNotionUI();
