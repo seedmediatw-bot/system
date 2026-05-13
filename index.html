@@ -2102,8 +2102,16 @@
         <div class="ph"><h2>批次 AI 匯入</h2><p>貼上會議記錄，AI 自動識別多位客戶並一次更新或新增</p></div>
         <div class="ai-area">
           <div class="ct">✦ 貼上會議記錄</div>
+          <div class="upload-zone" id="batch-drop" onclick="document.getElementById('batch-file-input').click()" ondragover="onDragOver(event,'batch-drop')" ondragleave="onDragLeave('batch-drop')" ondrop="onDrop(event,'batch')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p><span>點擊上傳截圖</span>或拖放圖片到這裡</p>
+            <p style="margin-top:4px;color:var(--text3);font-size:11px">支援 JPG、PNG、GIF、WebP（可多張）</p>
+          </div>
+          <input type="file" id="batch-file-input" accept="image/*" multiple style="display:none" onchange="addFiles('batch',this)">
+          <div class="thumb-list" id="batch-thumbs"></div>
           <div class="fg" style="margin-bottom:10px">
-            <textarea id="batch-ai-input" rows="7" placeholder="例：&#10;今天與 ABC公司 王總開會，討論影片製作方案，預算約15萬，下週回覆...&#10;另外 XYZ集團 李經理來電，對上次提案有疑慮，需補充說明...&#10;新客戶 海洋科技 陳董，透過介紹認識，有拍攝需求..."></textarea>
+            <label>或貼上文字（可與圖片合併分析）</label>
+            <textarea id="batch-ai-input" rows="5" placeholder="例：&#10;今天與 ABC公司 王總開會，討論影片製作方案，預算約15萬，下週回覆...&#10;另外 XYZ集團 李經理來電，對上次提案有疑慮，需補充說明...&#10;新客戶 海洋科技 陳董，透過介紹認識，有拍攝需求..."></textarea>
           </div>
           <div style="display:flex;align-items:center;gap:12px">
             <button class="btn btna" onclick="batchAnalyze()">✦ AI 批次分析</button>
@@ -3655,7 +3663,7 @@ function loadClients() {
   }
 
   // ── 檔案上傳 ───────────────────────────────────────────────
-  var _files = { add: [], update: [], callreport: [] };
+  var _files = { add: [], update: [], callreport: [], batch: [] };
 
   function addFiles(prefix, input) {
     Array.from(input.files).forEach(function(f){ _files[prefix].push(f); });
@@ -3928,8 +3936,9 @@ function loadClients() {
 
   function batchAnalyze() {
     var text = document.getElementById('batch-ai-input').value.trim();
-    if (!text) {
-      document.getElementById('batch-ai-status').textContent = '請先貼上會議記錄';
+    var hasFiles = _files.batch && _files.batch.length > 0;
+    if (!text && !hasFiles) {
+      document.getElementById('batch-ai-status').textContent = '請上傳截圖或貼上文字';
       document.getElementById('batch-ai-status').className = 'ai-status err';
       return;
     }
@@ -3937,10 +3946,13 @@ function loadClients() {
     document.getElementById('batch-ai-status').className = 'ai-status thinking';
     document.getElementById('batch-results').style.display = 'none';
 
-    fetch(crmApiBase + '/api/gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: BATCH_PROMPT + text }] }] })
+    filesToParts('batch').then(function(imgParts) {
+      var parts = imgParts.concat([{ text: BATCH_PROMPT + (text || '（請從圖片中找出所有客戶資訊）') }]);
+      return fetch(crmApiBase + '/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: parts }] })
+      });
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -4058,6 +4070,7 @@ function loadClients() {
         document.getElementById('batch-ai-input').value = '';
         document.getElementById('batch-results').style.display = 'none';
         document.getElementById('batch-ai-status').textContent = '';
+        _files.batch = []; renderThumbs('batch');
         loadClients();
       } else {
         showToast('完成 ' + ok + ' 筆，失敗 ' + fail + ' 筆', 'err');
