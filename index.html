@@ -1999,7 +1999,7 @@
             <label for="add-sync-call" style="font-size:13px;color:var(--text2);cursor:pointer">同步建立首筆拜訪記錄（使用「詳細現況備註」作為摘要）</label>
           </div>
           <div style="display:flex;gap:10px;margin-top:4px">
-            <button class="btn btnp" onclick="submitAdd()">送出到 Notion</button>
+            <button id="btn-add" class="btn btnp" onclick="submitAdd()">送出到 Notion</button>
             <button class="btn" onclick="resetAdd()">清除</button>
           </div>
         </div>
@@ -2078,7 +2078,7 @@
               <div class="fg"><label>承諾事項</label><input type="text" id="update-commitment"></div>
               <div class="fg"><label>詳細現況備註</label><textarea id="update-notes" rows="3"></textarea></div>
             </div>
-            <button class="btn btnp" style="margin-top:4px" onclick="submitUpdate()">更新到 Notion</button>
+            <button id="btn-update" class="btn btnp" style="margin-top:4px" onclick="submitUpdate()">更新到 Notion</button>
           </div>
         </div>
       </div>
@@ -2135,7 +2135,7 @@
             <div class="fg"><label>下次跟進日期</label><input type="date" id="call-nextdate"></div>
           </div>
           <div style="display:flex;gap:10px;margin-top:4px">
-            <button class="btn btnp" onclick="submitCall()">送出到 Notion</button>
+            <button id="btn-call" class="btn btnp" onclick="submitCall()">送出到 Notion</button>
             <button class="btn" onclick="resetCall()">清除</button>
           </div>
         </div>
@@ -2165,11 +2165,11 @@
         <div id="batch-results" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <div style="font-size:13px;color:var(--text2)">共 <span id="batch-count">0</span> 筆　<span style="color:var(--success);font-weight:500" id="batch-add-count"></span>　<span style="color:var(--accent);font-weight:500" id="batch-update-count"></span></div>
-            <button class="btn btnp" onclick="submitBatch()">全部送出</button>
+            <button id="btn-batch-top" class="btn btnp" onclick="submitBatch()">全部送出</button>
           </div>
           <div id="batch-cards"></div>
           <div style="margin-top:14px;text-align:right">
-            <button class="btn btnp" onclick="submitBatch()">全部送出</button>
+            <button id="btn-batch-bot" class="btn btnp" onclick="submitBatch()">全部送出</button>
           </div>
         </div>
       </div>
@@ -2376,8 +2376,8 @@
           </div>
 
           <div class="m-btn-row">
-            <button class="m-btn-primary" onclick="submitBothFromModal()">儲存並新增記錄</button>
-            <button class="m-btn-secondary" onclick="submitUpdateFromModal()">僅更新主檔</button>
+            <button id="btn-modal-both" class="m-btn-primary" onclick="submitBothFromModal()">儲存並新增記錄</button>
+            <button id="btn-modal-update" class="m-btn-secondary" onclick="onlyUpdateModal()">僅更新主檔</button>
           </div>
         </div>
 
@@ -3261,6 +3261,7 @@
       }).catch(function () { showToast('網路錯誤，請稍後重試', 'err'); });
     }
     function rt(v) { return [{ text: { content: v || '' } }]; }
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function buildLeaveProps(d) {
       var id = 'REQ-' + String(Date.now()).slice(-4);
       return {
@@ -3420,20 +3421,38 @@
     }
 
     // ── Toast ───────────────────────────────────────────────
+    function lockBtn(id, on) {
+      var b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = on;
+      b.style.opacity = on ? '0.55' : '';
+    }
+    function lockBtns(ids, on) { ids.forEach(function(id){ lockBtn(id, on); }); }
+
+    var _toastTimer = null;
     function showToast(msg, type) {
+      if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
       var t = document.getElementById('toast'); t.textContent = msg;
       t.className = 'toast show ' + (type || '');
-      setTimeout(function () { t.className = 'toast'; }, 3000);
+      _toastTimer = setTimeout(function () { t.className = 'toast'; _toastTimer = null; }, 3000);
     }
 
     // ── CRM Functions ──
-function loadClients() {
+  var _clientsCacheTs = 0;
+  var _CLIENTS_TTL = 5 * 60 * 1000; // 5 分鐘
+  var _historyCache = {}; // { clientId: results[] }
+
+  function loadClients(force) {
     var el = document.getElementById('client-list');
-    el.innerHTML = '<div class="empty">載入中...</div>';
     if (!crmKey || !nDBs.crm) {
         el.innerHTML = '<div class="empty">請先到「Notion 設定」填入 CRM 存取密鑰與 CRM 資料庫 ID 並儲存</div>';
         return;
     }
+    // 快取未過期且有資料時直接渲染，不重新 fetch
+    if (!force && CRM_DATA.length && (Date.now() - _clientsCacheTs < _CLIENTS_TTL)) {
+        renderClients(); return;
+    }
+    el.innerHTML = '<div class="empty">載入中...</div>';
     var body = JSON.stringify({ page_size: 100, sorts: [{ property: '客戶名稱', direction: 'ascending' }] });
     fetch(crmApiBase + '/api/crm/databases/' + nDBs.crm + '/query', {
         method: 'POST',
@@ -3446,6 +3465,7 @@ function loadClients() {
       })
       .then(function(data){
         if (!data.results) { document.getElementById('client-list').innerHTML = '<div class="empty">讀取失敗，請確認設定</div>'; return; }
+        _clientsCacheTs = Date.now();
         CRM_DATA = data.results.map(function(p){
           var pr = p.properties;
           return {
@@ -3486,14 +3506,14 @@ function loadClients() {
     el.innerHTML = CRM_DATA.map(function(c){
       var sc = STATUS_COLOR[c.status] || 'tgray';
       var pc = PRIORITY_COLOR[c.priority] || 'tgray';
-      return '<div class="client-row" onclick="openClientModal(\'' + c.id + '\')">' +
+      return '<div class="client-row" onclick="openClientModal(\'' + esc(c.id) + '\')">' +
         '<div class="client-info">' +
-          '<div class="client-name">' + (c.name || '未命名') + '</div>' +
-          '<div class="client-meta">' + (c.action || '尚無下一步') + (c.nextdate ? ' · 跟進：' + c.nextdate : '') + '</div>' +
+          '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
+          '<div class="client-meta">' + esc(c.action || '尚無下一步') + (c.nextdate ? ' · 跟進：' + esc(c.nextdate) : '') + '</div>' +
         '</div>' +
         '<div class="client-tags">' +
-          (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + c.status + '</span>' : '') +
-          (c.priority ? '<span class="tag ' + pc + '"><small style="opacity:0.7">優先：</small>' + c.priority + '</span>' : '') +
+          (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + esc(c.status) + '</span>' : '') +
+          (c.priority ? '<span class="tag ' + pc + '"><small style="opacity:0.7">優先：</small>' + esc(c.priority) + '</span>' : '') +
         '</div>' +
       '</div>';
     }).join('');
@@ -3565,6 +3585,7 @@ function loadClients() {
 
   function closeClientModal() {
     document.getElementById('modal-client').classList.remove('open');
+    if (selectedClientId) { delete _historyCache[selectedClientId]; selectedClientId = ''; }
   }
 
   function switchModalTab(name, el) {
@@ -3574,23 +3595,30 @@ function loadClients() {
     document.getElementById('m-panel-' + name).classList.add('active');
   }
 
-  function loadClientHistory(clientId, clientName) {
+  function loadClientHistory(clientId, clientName, force) {
     var listEl = document.getElementById('m-history-list');
+
+    // 快取命中（非強制刷新）
+    if (!force && _historyCache[clientId]) {
+      renderHistory(_historyCache[clientId]);
+      return;
+    }
+
     listEl.innerHTML = '<div class="empty">載入歷史紀錄中...</div>';
-    
-    // 透過 Notion Filter 抓取拜訪紀錄 (過濾條件：拜訪主旨 包含 客戶名稱)
     var filter = { property: '拜訪主旨', title: { contains: clientName } };
     var body = JSON.stringify({ filter: filter, sorts: [{ property: '拜訪日期', direction: 'descending' }] });
-    
+
     fetch(crmApiBase + '/api/crm/databases/' + nDBs.call + '/query', {
       method: 'POST', headers: crmH(),
       body: body
     }).then(function(r){ return r.json(); })
       .then(function(data){
         if (!data.results || data.results.length === 0) {
+          _historyCache[clientId] = [];
           listEl.innerHTML = '<div class="empty">尚無歷史紀錄</div>';
           return;
         }
+        _historyCache[clientId] = data.results;
         renderHistory(data.results);
       }).catch(function(){
         listEl.innerHTML = '<div class="empty">無法讀取歷史紀錄</div>';
@@ -3625,7 +3653,7 @@ function loadClients() {
   }
 
   function submitUpdateFromModal() {
-    if (!selectedClientId) return;
+    if (!selectedClientId) return Promise.resolve();
     var props = {
       '潛在客戶狀態': { select: { name: document.getElementById('m-status').value } },
       '優先級': { select: { name: document.getElementById('m-priority').value } },
@@ -3634,29 +3662,37 @@ function loadClients() {
     var nextdate = document.getElementById('m-nextdate').value;
     if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
     showToast('儲存中...', '');
-    fetch(crmApiBase + '/api/crm/pages/' + selectedClientId, {
+    return fetch(crmApiBase + '/api/crm/pages/' + selectedClientId, {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r){
       if (r.ok) {
-        showToast('主檔已更新', 'ok');
-        // 更新彈窗內的下一步行動 highlight
         var action = document.getElementById('m-action').value;
         var naBox = document.getElementById('m-next-action-box');
         if (action) { document.getElementById('m-next-action-text').textContent = action; naBox.style.display = ''; }
         else { naBox.style.display = 'none'; }
-        loadClients();
+        loadClients(true);
       } else { showToast('更新失敗', 'err'); }
+      return r;
     });
+  }
+
+  function onlyUpdateModal() {
+    lockBtns(['btn-modal-both','btn-modal-update'], true);
+    submitUpdateFromModal().then(function(r) {
+      lockBtns(['btn-modal-both','btn-modal-update'], false);
+      if (r && r.ok) showToast('主檔已更新', 'ok');
+    }).catch(function() { lockBtns(['btn-modal-both','btn-modal-update'], false); });
   }
 
   function submitBothFromModal() {
     var summary = document.getElementById('m-call-summary').value.trim();
-    // 先更新主檔
-    submitUpdateFromModal();
-    // 有填摘要才新增拜訪記錄
-    if (!summary) { showToast('主檔已更新（未填摘要，未新增拜訪記錄）', 'ok'); return; }
-    submitCallFromModal();
+    lockBtns(['btn-modal-both','btn-modal-update'], true);
+    submitUpdateFromModal().then(function(r) {
+      lockBtns(['btn-modal-both','btn-modal-update'], false);
+      if (!summary) { showToast('主檔已更新（未填摘要，未新增拜訪記錄）', 'ok'); return; }
+      if (r && r.ok) submitCallFromModal();
+    }).catch(function() { lockBtns(['btn-modal-both','btn-modal-update'], false); });
   }
 
   function submitCall() {
@@ -3682,14 +3718,16 @@ function loadClients() {
     if (commitment) props['承諾事項'] = { rich_text: rt(commitment) };
     if (action) props['下一步行動'] = { rich_text: rt(action) };
     if (nextdate) props['下次跟進日期'] = { date: { start: nextdate } };
+    lockBtn('btn-call', true);
     showToast('送出中...', '');
     fetch(crmApiBase + '/api/crm/pages', {
       method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.call }, properties: props })
     }).then(function(r){
+      lockBtn('btn-call', false);
       if (r.ok) { showToast('拜訪記錄已新增！', 'ok'); resetCall(); }
       else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
-    }).catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+    }).catch(function(){ lockBtn('btn-call', false); showToast('網路錯誤，請稍後重試', 'err'); });
   }
 
   function resetCall() {
@@ -3733,8 +3771,9 @@ function loadClients() {
             reaction: reaction,
             action: document.getElementById('m-action').value // 使用當前彈窗內的下一步行動
         });
-        document.getElementById('m-call-summary').value = ''; // 清空輸入
-        loadClientHistory(selectedClientId, client.name); // 重新載入歷史
+        document.getElementById('m-call-summary').value = '';
+        delete _historyCache[selectedClientId]; // 清除快取，強制重新 fetch
+        loadClientHistory(selectedClientId, client.name, true);
       } else {
         showToast('紀錄存檔失敗', 'err');
       }
@@ -3939,12 +3978,14 @@ function loadClients() {
     var name = document.getElementById('add-name').value.trim();
     if (!name) { showToast('請填入客戶名稱', 'err'); return; }
     var props = buildCRMProps('add', name);
+    lockBtn('btn-add', true);
     showToast('送出中...', '');
     fetch(crmApiBase + '/api/crm/pages', {
       method: 'POST', headers: crmH(),
       body: JSON.stringify({ parent: { database_id: nDBs.crm }, properties: props })
     })
     .then(function(r){
+      lockBtn('btn-add', false);
       if (r.ok) {
         showToast('客戶已新增到 Notion！', 'ok');
         var syncCall = document.getElementById('add-sync-call').checked;
@@ -3955,26 +3996,28 @@ function loadClients() {
             });
         }
         resetAdd();
-        loadClients();
+        loadClients(true);
       }
       else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
     })
-    .catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+    .catch(function(){ lockBtn('btn-add', false); showToast('網路錯誤，請稍後重試', 'err'); });
   }
 
   function submitUpdate() {
     if (!selectedClientId) { showToast('請先選擇客戶', 'err'); return; }
     var props = buildCRMProps('update', null);
+    lockBtn('btn-update', true);
     showToast('更新中...', '');
     fetch(crmApiBase + '/api/crm/pages/' + selectedClientId, {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     })
     .then(function(r){
-      if (r.ok) { showToast('客戶資料已更新！', 'ok'); loadClients(); }
+      lockBtn('btn-update', false);
+      if (r.ok) { showToast('客戶資料已更新！', 'ok'); loadClients(true); }
       else { r.json().then(function(e){ showToast('失敗：' + (e.message || '請確認設定'), 'err'); }); }
     })
-    .catch(function(){ showToast('網路錯誤，請稍後重試', 'err'); });
+    .catch(function(){ lockBtn('btn-update', false); showToast('網路錯誤，請稍後重試', 'err'); });
   }
 
   function buildCRMProps(prefix, name) {
@@ -4034,7 +4077,7 @@ function loadClients() {
       method: 'PATCH', headers: crmH(),
       body: JSON.stringify({ properties: props })
     }).then(function(r) {
-        if (r.ok) loadClients();
+        if (r.ok) loadClients(true);
     });
   }
 
@@ -4119,11 +4162,11 @@ function loadClients() {
       return '<div class="batch-card ' + (isAdd ? 'is-add' : 'is-update') + '" id="bcard-' + item.idx + '">' +
         '<div class="batch-head">' +
           '<span class="batch-badge ' + (isAdd ? 'add' : 'update') + '">' + (isAdd ? '新增' : '更新') + '</span>' +
-          '<span class="batch-name">' + (d.clientName || '未知') + '</span>' +
-          (item.matched ? '<span class="batch-matched">比對：' + item.matched.name + '</span>' : '') +
+          '<span class="batch-name">' + esc(d.clientName || '未知') + '</span>' +
+          (item.matched ? '<span class="batch-matched">比對：' + esc(item.matched.name) + '</span>' : '') +
           '<button class="batch-skip-btn" onclick="toggleBatchSkip(' + item.idx + ')">略過</button>' +
         '</div>' +
-        (tags.length ? '<div class="batch-summary-row">' + tags.map(function(t){ return '<span class="batch-summary-tag">' + t + '</span>'; }).join('') + '</div>' : '') +
+        (tags.length ? '<div class="batch-summary-row">' + tags.map(function(t){ return '<span class="batch-summary-tag">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
         '<div class="batch-body">' +
           batchField('batchnotes-' + item.idx, '備註', d.notes || '', 'textarea', true) +
           batchField('batchaction-' + item.idx, '下一步行動', d.nextAction || '', 'input', false) +
@@ -4138,13 +4181,14 @@ function loadClients() {
 
   function batchField(id, label, val, type, full) {
     var cls = 'batch-field' + (full ? ' batch-field-full' : '');
+    var ev = esc(val);
     if (type === 'textarea') {
-      return '<div class="' + cls + '"><label>' + label + '</label><textarea id="' + id + '" rows="2">' + val + '</textarea></div>';
+      return '<div class="' + cls + '"><label>' + esc(label) + '</label><textarea id="' + id + '" rows="2">' + ev + '</textarea></div>';
     }
     if (type === 'date') {
-      return '<div class="' + cls + '"><label>' + label + '</label><input type="date" id="' + id + '" value="' + val + '"></div>';
+      return '<div class="' + cls + '"><label>' + esc(label) + '</label><input type="date" id="' + id + '" value="' + ev + '"></div>';
     }
-    return '<div class="' + cls + '"><label>' + label + '</label><input type="text" id="' + id + '" value="' + val + '"></div>';
+    return '<div class="' + cls + '"><label>' + esc(label) + '</label><input type="text" id="' + id + '" value="' + ev + '"></div>';
   }
 
   function toggleBatchSkip(idx) {
@@ -4155,9 +4199,11 @@ function loadClients() {
     btn.textContent = BATCH_ITEMS[idx].skip ? '恢復' : '略過';
   }
 
+  var _batchBtns = ['btn-batch-top','btn-batch-bot'];
   function submitBatch() {
     var active = BATCH_ITEMS.filter(function(x) { return !x.skip; });
     if (!active.length) { showToast('沒有要送出的項目', 'err'); return; }
+    lockBtns(_batchBtns, true);
     showToast('送出中（共 ' + active.length + ' 筆）...', '');
 
     var tasks = active.map(function(item) {
@@ -4193,6 +4239,7 @@ function loadClients() {
     });
 
     Promise.all(tasks).then(function(responses) {
+      lockBtns(_batchBtns, false);
       var ok = responses.filter(function(r) { return r.ok; }).length;
       var fail = responses.length - ok;
       if (fail === 0) {
@@ -4201,11 +4248,11 @@ function loadClients() {
         document.getElementById('batch-results').style.display = 'none';
         document.getElementById('batch-ai-status').textContent = '';
         _files.batch = []; renderThumbs('batch');
-        loadClients();
+        loadClients(true);
       } else {
         showToast('完成 ' + ok + ' 筆，失敗 ' + fail + ' 筆', 'err');
       }
-    }).catch(function() { showToast('網路錯誤，請稍後重試', 'err'); });
+    }).catch(function() { lockBtns(_batchBtns, false); showToast('網路錯誤，請稍後重試', 'err'); });
   }
 
   // ── Reset ──────────────────────────────────────────────────
