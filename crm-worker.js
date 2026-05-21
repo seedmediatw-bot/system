@@ -106,6 +106,28 @@ async function handleAuth(request, env, origin) {
   }
 }
 
+// ── LINE Webhook（暫時用來取得 groupId）─────────────────────────
+
+async function handleLineWebhook(request) {
+  try {
+    const body = await request.json();
+    const events = body.events || [];
+    events.forEach(event => {
+      const source = event.source || {};
+      if (source.type === 'group') {
+        console.log('[LINE groupId]', source.groupId);
+      }
+      if (source.type === 'user') {
+        console.log('[LINE userId]', source.userId);
+      }
+    });
+  } catch (e) {
+    console.log('[LINE webhook error]', e.message);
+  }
+  // LINE 要求一定要回 200
+  return new Response('OK', { status: 200 });
+}
+
 // ── 主路由 ────────────────────────────────────────────────────
 
 export default {
@@ -121,9 +143,10 @@ export default {
       return okResponse({ ok: true, crm: !!env.CRM_TOKEN, gemini: !!env.GEMINI_API_KEY }, origin);
     }
 
-    if (pathname === '/api/auth')          return handleAuth(request, env, origin);
-    if (pathname.startsWith('/api/crm/'))  return handleCRM(request, env, pathname, origin);
-    if (pathname === '/api/gemini')        return handleGemini(request, env, origin);
+    if (pathname === '/api/auth')              return handleAuth(request, env, origin);
+    if (pathname.startsWith('/api/crm/'))      return handleCRM(request, env, pathname, origin);
+    if (pathname === '/api/gemini')            return handleGemini(request, env, origin);
+    if (pathname === '/api/line/webhook')      return handleLineWebhook(request);
 
     return errResponse('Route not found', origin, 404);
   },
