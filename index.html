@@ -2630,7 +2630,7 @@
       var id = 'ei' + eiCount;
       var div = document.createElement('div');
       div.className = 'eirow'; div.id = id;
-      div.innerHTML = '<input type="text" placeholder="說明費用內容" value="' + desc + '">'
+      div.innerHTML = '<input type="text" placeholder="說明費用內容" value="' + esc(desc) + '">'
         + '<select>' + CATS.map(function (c) { return '<option' + (c === cat ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>'
         + '<input type="date" value="' + date + '" onchange="calcEI()">'
         + '<input type="number" min="0" step="1" value="' + amt + '" placeholder="0" style="text-align:right" oninput="calcEI()">'
@@ -3042,9 +3042,9 @@
           document.getElementById('dash-recent').innerHTML = recent.map(function(r){
             var sc = r.status==='已核准' ? 'var(--success)' : r.status==='已駁回' ? 'var(--danger)' : 'var(--warning)';
             return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'
-              +'<div><div style="font-size:13px;font-weight:500">'+(r.name||'—')+' <span style="font-size:11px;color:var(--text3);font-weight:400">'+r.type+'</span></div>'
-              +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+r.detail+' · '+r.date+'</div></div>'
-              +'<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:var(--surface2);color:'+sc+';font-weight:500;white-space:nowrap">'+r.status+'</span>'
+              +'<div><div style="font-size:13px;font-weight:500">'+esc(r.name||'—')+' <span style="font-size:11px;color:var(--text3);font-weight:400">'+esc(r.type)+'</span></div>'
+              +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+esc(r.detail)+' · '+esc(r.date)+'</div></div>'
+              +'<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:var(--surface2);color:'+sc+';font-weight:500;white-space:nowrap">'+esc(r.status)+'</span>'
               +'</div>';
           }).join('');
         }
@@ -3144,8 +3144,8 @@
           : '';
         return '<div class="card" style="padding:16px 20px;margin-bottom:10px">'
           + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'
-          + '<div><div style="font-size:14px;font-weight:600">' + r.name + ' <span style="font-size:11px;font-weight:400;color:var(--text3)">' + r.id + '</span></div>'
-          + '<div style="font-size:12px;color:var(--text3)">' + r.title + ' · ' + r.date + ' · ' + r.dept + '</div></div>'
+          + '<div><div style="font-size:14px;font-weight:600">' + esc(r.name) + ' <span style="font-size:11px;font-weight:400;color:var(--text3)">' + esc(r.id) + '</span></div>'
+          + '<div style="font-size:12px;color:var(--text3)">' + esc(r.title) + ' · ' + esc(r.date) + ' · ' + esc(r.dept) + '</div></div>'
           + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
           + '<span class="tag ' + sc + '">' + r.status + '</span>'
           + (r.type === 'expense' ? '<button class="btn btnsm" onclick="viewReceipts(\'' + r.nid + '\')" style="padding:3px 8px;font-size:11px">📎 查看附件</button>' : '')
@@ -3880,7 +3880,7 @@
       return '<div class="thumb-item">' +
         (isImg
           ? '<img class="thumb-img" src="' + src + '">'
-          : '<div class="thumb-file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + f.name.slice(0,10) + '</div>') +
+          : '<div class="thumb-file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + esc(f.name.slice(0,10)) + '</div>') +
         '<button class="thumb-del" onclick="removeFile(\'' + prefix + '\',' + i + ')">✕</button>' +
         '</div>';
     }).join('');
