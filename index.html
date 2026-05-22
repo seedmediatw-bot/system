@@ -2432,8 +2432,8 @@
         if (data.ok) {
           sessionStorage.setItem(pendingSystem + '_auth', '1');
           if (data.accessKey) {
-            if (pendingSystem === 'hr') { hrKey = data.accessKey; localStorage.setItem('hrKey', hrKey); }
-            else { crmKey = data.accessKey; localStorage.setItem('crmKey', crmKey); }
+            if (pendingSystem === 'hr') { hrKey = data.accessKey; sessionStorage.setItem('hrKey', hrKey); }
+            else { crmKey = data.accessKey; sessionStorage.setItem('crmKey', crmKey); }
           }
           if (data.dbIds) {
             Object.keys(data.dbIds).forEach(function(k){ if (data.dbIds[k]) nDBs[k] = data.dbIds[k]; });
@@ -2514,22 +2514,11 @@
 
 
     // ── State ──────────────────────────────────────────────
-    var hrKey  = localStorage.getItem('hrKey')  || '';
-    var crmKey = localStorage.getItem('crmKey') || '';
+    var hrKey  = sessionStorage.getItem('hrKey')  || '';
+    var crmKey = sessionStorage.getItem('crmKey') || '';
     function hrH()  { return { 'Content-Type': 'application/json', 'X-Access-Key': hrKey };  }
     function crmH() { return { 'Content-Type': 'application/json', 'X-Access-Key': crmKey }; }
-    var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {
-      leave: '6846115f39e341a69c8c771f5e229c7c',
-      expense: '2f1e0e588b6a47c1b89d1392eca5272f',
-      employees: 'b1ba6f957a114a828da1b7018949114d',
-      approvals: 'f3f9a9bcc4a9447fb9623723952e33b2',
-      checkin: '2c99853a8c8c477aac90d188ad2362ce',
-      crm: '3568bb31aaa281bcb7b1f4550e01795c',
-      call: 'd68816abcca34320b8e3fcba1029299e'
-    };
-    // 確保 CRM 相關 ID 存在 (遷移舊資料)
-    if (!nDBs.crm) nDBs.crm = localStorage.getItem('crm_crmdb') || '3568bb31aaa281bcb7b1f4550e01795c';
-    if (!nDBs.call) nDBs.call = localStorage.getItem('crm_calldb') || 'd68816abcca34320b8e3fcba1029299e';
+    var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {};
 
     var RECORDS = [];
     var LOCAL_EXPENSE_CACHE = []; // 本地暫存近期報帳紀錄（含圖片）
@@ -3321,15 +3310,15 @@
     function confirmKey(type) {
       var val = document.getElementById(type + '-key-val').value.trim();
       if (!val) { showToast('請輸入密鑰', 'err'); return; }
-      if (type === 'hr') { hrKey = val; localStorage.setItem('hrKey', hrKey); }
-      else               { crmKey = val; localStorage.setItem('crmKey', crmKey); }
+      if (type === 'hr') { hrKey = val; sessionStorage.setItem('hrKey', hrKey); }
+      else               { crmKey = val; sessionStorage.setItem('crmKey', crmKey); }
       cancelKeyInput(type);
       updateNotionUI();
       showToast(type.toUpperCase() + ' 密鑰已儲存', 'ok');
     }
     function removeKey(type) {
-      if (type === 'hr') { hrKey = ''; localStorage.removeItem('hrKey'); }
-      else               { crmKey = ''; localStorage.removeItem('crmKey'); }
+      if (type === 'hr') { hrKey = ''; sessionStorage.removeItem('hrKey'); }
+      else               { crmKey = ''; sessionStorage.removeItem('crmKey'); }
       updateNotionUI();
       showToast(type.toUpperCase() + ' 密鑰已移除', 'ok');
     }
