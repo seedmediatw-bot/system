@@ -124,7 +124,6 @@ async function handleLineWebhook(request) {
   } catch (e) {
     console.log('[LINE webhook error]', e.message);
   }
-  // LINE 要求一定要回 200
   return new Response('OK', { status: 200 });
 }
 

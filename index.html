@@ -2450,8 +2450,8 @@
         if (data.ok) {
           sessionStorage.setItem(pendingSystem + '_auth', '1');
           if (data.accessKey) {
-            if (pendingSystem === 'hr') { hrKey = data.accessKey; sessionStorage.setItem('hrKey', hrKey); }
-            else { crmKey = data.accessKey; sessionStorage.setItem('crmKey', crmKey); }
+            if (pendingSystem === 'hr') { hrKey = data.accessKey; }
+            else { crmKey = data.accessKey; }
           }
           if (data.dbIds) {
             Object.keys(data.dbIds).forEach(function(k){ if (data.dbIds[k]) nDBs[k] = data.dbIds[k]; });
@@ -2517,6 +2517,10 @@
       document.getElementById('system-select').classList.remove('hidden');
     }
     function goHome() {
+      sessionStorage.removeItem('hr_auth');
+      sessionStorage.removeItem('crm_auth');
+      hrKey  = '';
+      crmKey = '';
       document.getElementById('system-select').classList.remove('hidden');
       closeSidebar();
     }
@@ -2532,8 +2536,8 @@
 
 
     // ── State ──────────────────────────────────────────────
-    var hrKey  = sessionStorage.getItem('hrKey')  || '';
-    var crmKey = sessionStorage.getItem('crmKey') || '';
+    var hrKey  = '';
+    var crmKey = '';
     function hrH()  { return { 'Content-Type': 'application/json', 'X-Access-Key': hrKey };  }
     function crmH() { return { 'Content-Type': 'application/json', 'X-Access-Key': crmKey }; }
     var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {};
@@ -4306,8 +4310,6 @@
       }
     }).catch(function () { });
     updateNotionUI();
-    renderTracker();
-    loadDashboard();
     document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
     // Deploy Trigger: 2026-05-12
   </script>
