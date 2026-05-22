@@ -2303,6 +2303,16 @@
         <div class="m-na-text" id="m-next-action-text"></div>
       </div>
 
+      <!-- 承諾事項 / 現況備註 display -->
+      <div class="m-next-action" id="m-commitment-box" style="display:none; background:#fffbeb; border-left-color:#d97706">
+        <div class="m-na-label">承諾事項</div>
+        <div class="m-na-text" id="m-commitment-text"></div>
+      </div>
+      <div class="m-next-action" id="m-notes-box" style="display:none; background:#f8f9fa; border-left-color:#9ca3af">
+        <div class="m-na-label">現況備註</div>
+        <div class="m-na-text" id="m-notes-text"></div>
+      </div>
+
       <!-- Tabs -->
       <div class="m-tabs">
         <div class="m-tab active" onclick="switchModalTab('history', this)">歷史拜訪</div>
@@ -2343,6 +2353,14 @@
             <div class="fg">
               <label>下次跟進日期</label>
               <input type="date" id="m-nextdate">
+            </div>
+            <div class="fg" style="margin-top:10px">
+              <label>承諾事項</label>
+              <input type="text" id="m-commitment" placeholder="雙方承諾的事項...">
+            </div>
+            <div class="fg" style="margin-top:10px">
+              <label>詳細現況備註</label>
+              <textarea id="m-notes" rows="2" placeholder="目前進度、背景資訊..."></textarea>
             </div>
           </div>
 
@@ -3533,16 +3551,20 @@
 
     // 狀態摘要條
     var REACTION_COLOR = { '正面': 'tgreen', '猶豫': 'tyellow', '有疑慮': 'tred' };
+    var CONTACT_COLOR  = { '電話': 'tblue', '視訊': 'tblue', '見面': 'tgreen', 'LINE': 'tgreen', 'Email': 'tgray' };
     var sc = STATUS_COLOR[c.status] || 'tgray';
     var pc = PRIORITY_COLOR[c.priority] || 'tgray';
     var rc = REACTION_COLOR[c.reaction] || '';
+    var cc = CONTACT_COLOR[c.contact]  || 'tgray';
     var bar = '';
-    if (c.status) bar += '<span class="tag ' + sc + ' m-badge">' + c.status + '</span>';
-    if (c.priority) bar += '<span class="tag ' + pc + ' m-badge">' + c.priority + '</span>';
-    if (c.reaction) bar += '<span class="tag ' + rc + ' m-badge">' + c.reaction + '</span>';
+    if (c.status)   bar += '<span class="tag ' + sc + ' m-badge">' + esc(c.status)   + '</span>';
+    if (c.priority) bar += '<span class="tag ' + pc + ' m-badge">' + esc(c.priority) + '</span>';
+    if (c.reaction) bar += '<span class="tag ' + rc + ' m-badge">' + esc(c.reaction) + '</span>';
+    if (c.contact)  bar += '<span class="tag ' + cc + ' m-badge">' + esc(c.contact)  + '</span>';
     var pills = '';
-    if (c.lastdate) pills += '<span class="m-date-pill">上次 <span>' + c.lastdate + '</span></span>';
-    if (c.nextdate) pills += '<span class="m-date-pill">跟進 <span>' + c.nextdate + '</span></span>';
+    if (c.lastdate) pills += '<span class="m-date-pill">上次 <span>' + esc(c.lastdate) + '</span></span>';
+    if (c.nextdate) pills += '<span class="m-date-pill">跟進 <span>' + esc(c.nextdate) + '</span></span>';
+    if (c.amount)   pills += '<span class="m-date-pill">金額 <span>NT$' + c.amount.toLocaleString() + '</span></span>';
     if (pills) bar += '<div class="m-date-pills">' + pills + '</div>';
     document.getElementById('m-status-bar').innerHTML = bar;
 
@@ -3554,12 +3576,22 @@
     } else {
       naBox.style.display = 'none';
     }
+    // 承諾事項 display
+    var commitBox = document.getElementById('m-commitment-box');
+    if (c.commitment) { document.getElementById('m-commitment-text').textContent = c.commitment; commitBox.style.display = ''; }
+    else { commitBox.style.display = 'none'; }
+    // 現況備註 display
+    var notesBox = document.getElementById('m-notes-box');
+    if (c.notes) { document.getElementById('m-notes-text').textContent = c.notes; notesBox.style.display = ''; }
+    else { notesBox.style.display = 'none'; }
 
     // 表單預填
     document.getElementById('m-status').value = c.status || '跟進中';
     document.getElementById('m-priority').value = c.priority || '跟進中';
     document.getElementById('m-action').value = c.action || '';
     document.getElementById('m-nextdate').value = c.nextdate || '';
+    document.getElementById('m-commitment').value = c.commitment || '';
+    document.getElementById('m-notes').value = c.notes || '';
     document.getElementById('m-call-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('m-call-summary').value = '';
     document.getElementById('m-call-reaction').value = '';
@@ -3594,7 +3626,7 @@
     }
 
     listEl.innerHTML = '<div class="empty">載入歷史紀錄中...</div>';
-    var filter = { property: '拜訪主旨', title: { contains: clientName } };
+    var filter = { property: '客戶', relation: { contains: clientId } };
     var body = JSON.stringify({ filter: filter, sorts: [{ property: '拜訪日期', direction: 'descending' }] });
 
     fetch(crmApiBase + '/api/crm/databases/' + nDBs.call + '/query', {
@@ -3620,20 +3652,23 @@
     var html = '<div class="timeline">';
     results.forEach(function(p, i){
       var pr = p.properties;
-      var date    = gp(pr, '拜訪日期', 'date') || '未知日期';
-      var summary = gp(pr, '會議摘要', 'text') || '（無內容）';
-      var contact = gp(pr, '聯繫方式', 'select');
-      var reaction = gp(pr, '客戶反應', 'select');
+      var date       = gp(pr, '拜訪日期', 'date') || '未知日期';
+      var summary    = gp(pr, '對話摘要', 'text') || '（無內容）';
+      var contact    = gp(pr, '聯繫方式', 'select');
+      var reaction   = gp(pr, '客戶反應', 'select');
       var commitment = gp(pr, '承諾事項', 'text');
+      var nextAction = gp(pr, '下一步行動', 'text');
+      var owner      = gp(pr, '負責人', 'select');
       var isOld = i > 0;
       html += '<div class="timeline-item">' +
         '<div class="tl-left"><div class="tl-dot' + (isOld ? ' old' : '') + '"></div><div class="tl-line"></div></div>' +
         '<div class="tl-body">' +
-          '<div class="tl-date">' + date + (contact ? '　' + contact : '') + '</div>' +
-          '<div class="tl-content">' + summary + '</div>' +
+          '<div class="tl-date">' + esc(date) + (contact ? '　' + esc(contact) : '') + (owner ? '　' + esc(owner) : '') + '</div>' +
+          '<div class="tl-content">' + esc(summary) + '</div>' +
           '<div class="tl-meta">' +
-            (reaction ? '<span class="tl-tag">' + reaction + '</span>' : '') +
-            (commitment ? '<span class="tl-tag">承諾：' + commitment + '</span>' : '') +
+            (reaction   ? '<span class="tl-tag">' + esc(reaction)   + '</span>' : '') +
+            (commitment ? '<span class="tl-tag">承諾：' + esc(commitment) + '</span>' : '') +
+            (nextAction ? '<span class="tl-tag">→ ' + esc(nextAction) + '</span>' : '') +
           '</div>' +
         '</div></div>';
     });
@@ -3646,7 +3681,9 @@
     var props = {
       '潛在客戶狀態': { select: { name: document.getElementById('m-status').value } },
       '優先級': { select: { name: document.getElementById('m-priority').value } },
-      '下一步行動': { rich_text: rt(document.getElementById('m-action').value) }
+      '下一步行動': { rich_text: rt(document.getElementById('m-action').value) },
+      '承諾事項': { rich_text: rt(document.getElementById('m-commitment').value) },
+      '詳細現況備註': { rich_text: rt(document.getElementById('m-notes').value) }
     };
     var nextdate = document.getElementById('m-nextdate').value;
     if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
@@ -3698,9 +3735,9 @@
     var action = document.getElementById('call-action').value;
     var nextdate = document.getElementById('call-nextdate').value;
     var props = {
-      '拜訪主旨': { title: rt((client ? client.name : '') + ' — ' + date) },
+      '標題': { title: rt((client ? client.name : '') + ' — ' + date) },
       '拜訪日期': { date: { start: date } },
-      '會議摘要': { rich_text: rt(summary) }
+      '對話摘要': { rich_text: rt(summary) }
     };
     if (contact) props['聯繫方式'] = { select: { name: contact } };
     if (reaction) props['客戶反應'] = { select: { name: reaction } };
@@ -3739,9 +3776,9 @@
     var contact = document.getElementById('m-call-contact').value;
     
     var props = {
-      '拜訪主旨': { title: rt(client.name + ' — ' + date) },
+      '標題': { title: rt(client.name + ' — ' + date) },
       '拜訪日期': { date: { start: date } },
-      '會議摘要': { rich_text: rt(summary) }
+      '對話摘要': { rich_text: rt(summary) }
     };
     if (contact) props['聯繫方式'] = { select: { name: contact } };
     if (reaction) props['客戶反應'] = { select: { name: reaction } };
@@ -4040,9 +4077,9 @@
   function createInitialCall(clientId, clientName, notes) {
     var date = new Date().toISOString().split('T')[0];
     var props = {
-      '拜訪主旨': { title: rt(clientName + ' — 建立首筆紀錄') },
+      '標題': { title: rt(clientName + ' — 建立首筆紀錄') },
       '拜訪日期': { date: { start: date } },
-      '會議摘要': { rich_text: rt(notes) },
+      '對話摘要': { rich_text: rt(notes) },
       '聯繫方式': { select: { name: '見面' } }
     };
     fetch(crmApiBase + '/api/crm/pages', {
