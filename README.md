@@ -126,7 +126,6 @@ GitHub Pages（index.html，靜態網頁）
 | `DB_EMPLOYEES` | 員工資料庫 ID |
 | `DB_APPROVALS` | 審核記錄資料庫 ID |
 | `DB_CHECKIN` | 員工簽到記錄資料庫 ID |
-| `DB_ACCOUNTS` | 帳號管理資料庫 ID |
 
 ### CRM Worker（crm-worker.js）
 
@@ -196,7 +195,7 @@ git push
 ```
 
 > `index.html` 推上去後 GitHub Pages 會自動更新（約 1 分鐘）。
-> `cloudflare-worker.js` 需手動貼到 Cloudflare Workers 後台才生效。
+> `hr-worker.js` / `crm-worker.js` 需手動貼到對應的 Cloudflare Workers 後台才生效。
 
 ---
 
@@ -215,5 +214,5 @@ git push
 ## 🗺️ 開發計畫
 
 - [ ] 收據圖片自動上傳（Cloudflare R2 串接）
-- [ ] LINE Bot / Email 審核通知
+- [/] LINE Bot 審核通知（進行中 — Webhook 端點已建立，待取得 groupId 與 Channel Access Token）
 - [ ] CRM 數據視覺化（拜訪頻率與客戶分佈統計圖表）
