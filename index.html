@@ -3312,7 +3312,6 @@
         '備註': { rich_text: rt(d.note) }
       };
     }
-    function saveToken() { /* 已由 confirmKey 取代 */ }
     function saveApiBase() {
       hrApiBase  = document.getElementById('inp-hr-api').value.trim().replace(/\/$/, '');
       crmApiBase = document.getElementById('inp-crm-api').value.trim().replace(/\/$/, '');
@@ -3370,7 +3369,7 @@
             showToast('Worker 回應異常', 'err');
           }
         })
-        .catch(function (e) { showToast('連線失敗：無法接觸伺服器', 'err'); console.error(e); });
+        .catch(function () { showToast('連線失敗：無法接觸伺服器', 'err'); });
     }
     function updateNotionUI() {
       var connected = !!(hrKey || crmKey);
@@ -3810,9 +3809,6 @@
     });
   }
 
-  function syncModalToUpdate() {
-    // 這裡可以做一些即時連動，目前暫時不需要
-  }
   // --- Modal Logic END ---
 
   function goCallReport(id) {
