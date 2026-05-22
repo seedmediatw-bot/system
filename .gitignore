@@ -7,3 +7,4 @@
 !.gitignore
 !hr-worker.js
 !crm-worker.js
+!server.js
