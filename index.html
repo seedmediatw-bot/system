@@ -3258,6 +3258,25 @@
         showToast('收據圖片已附加至 Notion！', 'ok');
       }).catch(function(e){ showToast('附加圖片錯誤：' + (e.message||''), 'err'); });
     }
+    function lineNotify(type, data) {
+      if (!hrKey || !hrApiBase) return;
+      var msg = '';
+      if (type === 'leave') {
+        msg = '📋 新請假申請\n員工：' + data.name + '　假別：' + data.type
+            + '\n日期：' + data.start + ' ～ ' + data.end + '（' + data.days + ' 天）'
+            + (data.reason ? '\n原因：' + data.reason : '');
+      } else if (type === 'expense') {
+        var cats = data.items.map(function(i){ return i.cat; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).join('、');
+        msg = '💰 新報帳申請\n員工：' + data.name + '　金額：NT$' + Math.round(data.total).toLocaleString()
+            + '\n項目：' + cats
+            + (data.project ? '\n專案：' + data.project : '');
+      }
+      if (!msg) return;
+      fetch(hrApiBase + '/api/hr/line/notify', {
+        method: 'POST', headers: hrH(), body: JSON.stringify({ message: msg })
+      }).catch(function(){});
+    }
+
     function pushNotion(type, data, fileIds) {
       var dbId = type === 'onboarding' ? nDBs.employees : type === 'leave' ? nDBs.leave : type === 'expense' ? nDBs.expense : nDBs.checkin;
       if (!hrKey || !dbId) {
@@ -3289,6 +3308,7 @@
             }
             showToast('已成功同步至 Notion！', 'ok');
             addAIMsg('bot', '✅ ' + data.name + ' 的申請已送出並同步至 Notion！編號 ' + id + '。');
+            if (type === 'leave' || type === 'expense') lineNotify(type, data);
             if (fileIds && fileIds.length && page.id) appendImageBlocks(page.id, fileIds);
           });
         } else {
