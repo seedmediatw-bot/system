@@ -168,7 +168,7 @@ async function handleAuth(request, env, origin) {
       const dbIds = system === 'hr' ? {
         leave: env.DB_LEAVE, expense: env.DB_EXPENSE,
         employees: env.DB_EMPLOYEES, approvals: env.DB_APPROVALS,
-        checkin: env.DB_CHECKIN, accounts: env.DB_ACCOUNTS,
+        checkin: env.DB_CHECKIN, interview: env.DB_INTERVIEW,
       } : {};
       return okResponse({ ok: true, accessKey: system === 'hr' ? env.HR_ACCESS_KEY : null, dbIds }, origin);
     }
