@@ -3261,6 +3261,7 @@
     function lineNotify(type, data) {
       if (!hrKey || !hrApiBase) return;
       var msg = '';
+      var today = new Date().toISOString().split('T')[0];
       if (type === 'leave') {
         msg = '📋 新請假申請\n員工：' + data.name + '　假別：' + data.type
             + '\n日期：' + data.start + ' ～ ' + data.end + '（' + data.days + ' 天）'
@@ -3270,6 +3271,21 @@
         msg = '💰 新報帳申請\n員工：' + data.name + '　金額：NT$' + Math.round(data.total).toLocaleString()
             + '\n項目：' + cats
             + (data.project ? '\n專案：' + data.project : '');
+      } else if (type === 'iv-new') {
+        msg = '📋 新應徵者\n姓名：' + data.name
+            + (data.position ? '　職務：' + data.position : '')
+            + '\n應徵時間：' + today;
+      } else if (type === 'iv-stage') {
+        msg = '📅 面試進度更新\n' + data.name
+            + (data.position ? '（' + data.position + '）' : '')
+            + '\n→ ' + data.stage
+            + (data.manager ? '\n負責：' + data.manager : '');
+      } else if (type === 'iv-rating') {
+        msg = '✅ 面試評分完成\n' + data.name
+            + (data.position ? '（' + data.position + '）' : '')
+            + '\n評級：' + data.rating
+            + (data.notes ? '\n評語：' + data.notes : '')
+            + (data.manager ? '\n負責：' + data.manager : '');
       }
       if (!msg) return;
       fetch(hrApiBase + '/api/hr/line/notify', {
@@ -3604,7 +3620,11 @@
     }).then(function(r){
       if (r.ok) {
         var c = IV_DATA.find(function(x){ return x.id === id; });
-        if (c) c[field] = value;
+        if (c) {
+          c[field] = value;
+          if (field === 'stage') lineNotify('iv-stage', { name: c.name, position: c.position, stage: value, manager: c.manager });
+          if (field === 'rating') lineNotify('iv-rating', { name: c.name, position: c.position, rating: value, notes: c.notes, manager: c.manager });
+        }
         updateIvAlert(); renderInterviewees(); showToast('已更新', 'ok');
       } else { showToast('更新失敗', 'err'); }
     });
@@ -3655,6 +3675,7 @@
       lockBtn('btn-iv-submit', false);
       if (r.ok) {
         showToast('候選人已新增', 'ok');
+        lineNotify('iv-new', { name: name, position: position });
         toggleAddInterviewee();
         ['iv-name','iv-phone','iv-email','iv-manager','iv-notes'].forEach(function(id){ document.getElementById(id).value = ''; });
         ['iv-position','iv-stage','iv-rating'].forEach(function(id){ document.getElementById(id).selectedIndex = 0; });
