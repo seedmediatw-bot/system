@@ -2253,8 +2253,8 @@
         <!-- Settings -->
         <div class="page" id="page-settings">
           <div class="ph">
-            <h2>Notion 設定</h2>
-            <p>設定 Notion API 串接，讓申請資料自動同步到 Notion</p>
+            <h2>系統設定</h2>
+            <p>設定 Cloudflare Worker 網址，密鑰與資料庫 ID 均由 Worker 環境變數管理</p>
           </div>
           <div class="card">
             <div class="ct">Worker 網址</div>
@@ -2262,61 +2262,8 @@
               <div class="fg"><label>HR Worker URL</label><input type="text" id="inp-hr-api" placeholder="https://hr-worker.xxx.workers.dev"></div>
               <div class="fg"><label>CRM Worker URL</label><input type="text" id="inp-crm-api" placeholder="https://crm-worker.xxx.workers.dev"></div>
             </div>
-            <button class="btn btnp" onclick="saveApiBase()">儲存 Worker 網址</button>
-          </div>
-          <div class="card">
-            <div class="ct">存取密鑰</div>
-            <p style="font-size:13px;color:var(--text2);margin-bottom:16px">密鑰由管理員設定於 Cloudflare Worker 環境變數，輸入後永久遮罩，無法查看。</p>
-            <div class="key-row">
-              <div class="key-info">
-                <span class="key-label">HR 存取密鑰</span>
-                <span class="key-status" id="hr-key-status"></span>
-              </div>
-              <div class="key-btns">
-                <button class="btn btnsm danger" id="hr-key-remove" onclick="removeKey('hr')">移除</button>
-                <button class="btn btnsm btnp" id="hr-key-add" onclick="showKeyInput('hr')">新增</button>
-              </div>
-            </div>
-            <div class="key-input-row" id="hr-key-input">
-              <input type="password" id="hr-key-val" placeholder="輸入 HR_ACCESS_KEY" autocomplete="off">
-              <button class="btn btnsm btnp" onclick="confirmKey('hr')">確認</button>
-              <button class="btn btnsm" onclick="cancelKeyInput('hr')">取消</button>
-            </div>
-            <div class="key-row" style="margin-top:12px">
-              <div class="key-info">
-                <span class="key-label">CRM 存取密鑰</span>
-                <span class="key-status" id="crm-key-status"></span>
-              </div>
-              <div class="key-btns">
-                <button class="btn btnsm danger" id="crm-key-remove" onclick="removeKey('crm')">移除</button>
-                <button class="btn btnsm btnp" id="crm-key-add" onclick="showKeyInput('crm')">新增</button>
-              </div>
-            </div>
-            <div class="key-input-row" id="crm-key-input">
-              <input type="password" id="crm-key-val" placeholder="輸入 CRM_ACCESS_KEY" autocomplete="off">
-              <button class="btn btnsm btnp" onclick="confirmKey('crm')">確認</button>
-              <button class="btn btnsm" onclick="cancelKeyInput('crm')">取消</button>
-            </div>
-          </div>
-          <div class="card">
-            <div class="ct">資料庫 ID（已預設）</div>
-            <div class="cfgbox">
-              <h3>如何確認 Database ID</h3>
-              <p style="font-size:13px;color:var(--text2);line-height:1.8">在 Notion 開啟資料庫頁面，從 URL 中複製 32 碼英數字即為 Database
-                ID。</p>
-            </div>
-            <div class="grid2">
-              <div class="fg"><label>請假申請 Database ID</label><input type="password" id="db-leave" autocomplete="off"></div>
-              <div class="fg"><label>報帳申請 Database ID</label><input type="password" id="db-expense" autocomplete="off"></div>
-              <div class="fg"><label>員工資料庫 Database ID</label><input type="password" id="db-employees" autocomplete="off"></div>
-              <div class="fg"><label>審核記錄 Database ID</label><input type="password" id="db-approvals" autocomplete="off"></div>
-              <div class="fg"><label>員工簽到 Database ID</label><input type="password" id="db-checkin" autocomplete="off"></div>
-              <div class="fg"><label>面試管理 Database ID</label><input type="password" id="db-interview" autocomplete="off"></div>
-              <div class="fg"><label>CRM 客戶 Database ID</label><input type="password" id="db-crm" autocomplete="off"></div>
-              <div class="fg"><label>CRM 拜訪 Database ID</label><input type="password" id="db-call" autocomplete="off"></div>
-            </div>
-            <div style="margin-top:14px;display:flex;gap:10px">
-              <button class="btn btnp" onclick="saveDBs()">儲存設定</button>
+            <div style="display:flex;gap:10px">
+              <button class="btn btnp" onclick="saveApiBase()">儲存 Worker 網址</button>
               <button class="btn" onclick="testNotion()">測試連線</button>
             </div>
           </div>
@@ -3398,44 +3345,8 @@
       updateNotionUI();
       showToast('Worker 網址已儲存', 'ok');
     }
-    function showKeyInput(type) {
-      document.getElementById(type + '-key-input').style.display = 'flex';
-      document.getElementById(type + '-key-val').focus();
-    }
-    function cancelKeyInput(type) {
-      document.getElementById(type + '-key-input').style.display = 'none';
-      document.getElementById(type + '-key-val').value = '';
-    }
-    function confirmKey(type) {
-      var val = document.getElementById(type + '-key-val').value.trim();
-      if (!val) { showToast('請輸入密鑰', 'err'); return; }
-      if (type === 'hr') { hrKey = val; sessionStorage.setItem('hrKey', hrKey); }
-      else               { crmKey = val; sessionStorage.setItem('crmKey', crmKey); }
-      cancelKeyInput(type);
-      updateNotionUI();
-      showToast(type.toUpperCase() + ' 密鑰已儲存', 'ok');
-    }
-    function removeKey(type) {
-      if (type === 'hr') { hrKey = ''; sessionStorage.removeItem('hrKey'); }
-      else               { crmKey = ''; sessionStorage.removeItem('crmKey'); }
-      updateNotionUI();
-      showToast(type.toUpperCase() + ' 密鑰已移除', 'ok');
-    }
-    function saveDBs() {
-      nDBs = {
-        leave: document.getElementById('db-leave').value.trim(), expense: document.getElementById('db-expense').value.trim(),
-        employees: document.getElementById('db-employees').value.trim(), approvals: document.getElementById('db-approvals').value.trim(),
-        checkin: document.getElementById('db-checkin').value.trim(),
-        interview: document.getElementById('db-interview').value.trim(),
-        crm: document.getElementById('db-crm').value.trim(),
-        call: document.getElementById('db-call').value.trim()
-      };
-      localStorage.setItem('nDBs', JSON.stringify(nDBs));
-      updateNotionUI();
-      showToast('設定已儲存', 'ok');
-    }
     function testNotion() {
-      if (!hrKey && !crmKey) { showToast('請先填入 HR 或 CRM 存取密鑰', 'err'); return; }
+      if (!hrKey && !crmKey) { showToast('請先登入 HR 或 CRM 系統', 'err'); return; }
       showToast('測試中...', '');
       fetch(hrApiBase + '/api/status')
         .then(function (r) { return r.json(); })
@@ -3453,29 +3364,10 @@
     function updateNotionUI() {
       var connected = !!(hrKey || crmKey);
       document.getElementById('ndot').className = connected ? 'ndot on' : 'ndot';
-      document.getElementById('nlabel').textContent = connected ? '已設定存取密鑰' : '未設定密鑰';
+      document.getElementById('nlabel').textContent = connected ? '已連線' : '未登入';
       document.getElementById('nstatus-detail').innerHTML = connected
-        ? '<span style="color:var(--success)">✓ 密鑰已設定</span><br><br>HR 密鑰：' + (hrKey ? '已設定' : '未設定') + '<br>CRM 密鑰：' + (crmKey ? '已設定' : '未設定') + '<br><br>請假 DB：' + (nDBs.leave ? '已設定' : '未設定') + '<br>報帳 DB：' + (nDBs.expense ? '已設定' : '未設定') + '<br>簽到 DB：' + (nDBs.checkin ? '已設定' : '未設定')
-        : '尚未設定存取密鑰，請填入 HR 與 CRM 密鑰。';
-      // 更新密鑰狀態標籤與按鈕
-      ['hr', 'crm'].forEach(function(t) {
-        var key = t === 'hr' ? hrKey : crmKey;
-        var st = document.getElementById(t + '-key-status');
-        var rm = document.getElementById(t + '-key-remove');
-        var add = document.getElementById(t + '-key-add');
-        if (!st) return;
-        if (key) {
-          st.textContent = '● 已設定'; st.className = 'key-status set';
-          rm.style.display = ''; add.textContent = '變更';
-        } else {
-          st.textContent = '○ 未設定'; st.className = 'key-status unset';
-          rm.style.display = 'none'; add.textContent = '新增';
-        }
-      });
-      ['leave', 'expense', 'employees', 'approvals', 'checkin', 'interview', 'crm', 'call'].forEach(function(k) {
-        var el = document.getElementById('db-' + k);
-        if (el) el.value = nDBs[k] || '';
-      });
+        ? '<span style="color:var(--success)">✓ 已登入</span><br><br>HR：' + (hrKey ? '已登入' : '未登入') + '　CRM：' + (crmKey ? '已登入' : '未登入')
+        : '尚未登入，請使用 HR 或 CRM 登入頁面。';
       var hrApiEl = document.getElementById('inp-hr-api'); if (hrApiEl) hrApiEl.value = hrApiBase;
       var crmApiEl = document.getElementById('inp-crm-api'); if (crmApiEl) crmApiEl.value = crmApiBase;
     }
