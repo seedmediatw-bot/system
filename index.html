@@ -1455,6 +1455,14 @@
           </svg>
           <span>審核追蹤</span>
         </div>
+        <div class="nav-sec">財務</div>
+        <div class="nav-item" onclick="navTo('accounts',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+            <line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+          <span>繳費紀錄</span>
+        </div>
         <div class="nav-sec">人才</div>
         <div class="nav-item" onclick="navTo('interview',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1984,6 +1992,79 @@
 
           <!-- 候選人列表 -->
           <div id="iv-list"><div class="empty">載入中...</div></div>
+        </div>
+
+        <!-- 繳費紀錄 -->
+        <div class="page" id="page-accounts">
+          <div class="ph" style="display:flex;align-items:flex-start;justify-content:space-between">
+            <div><h2>繳費紀錄</h2><p>帳單、訂閱、水電費等繳費管理</p></div>
+            <button class="btn btnp" onclick="toggleAddAccount()">＋ 新增紀錄</button>
+          </div>
+
+          <!-- 統計 -->
+          <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+            <div class="stat"><div class="statn tred" id="ac-stat-pending" style="font-size:22px">—</div><div class="statl">待繳件數</div></div>
+            <div class="stat"><div class="statn" id="ac-stat-paid" style="font-size:22px">—</div><div class="statl">已繳件數</div></div>
+            <div class="stat"><div class="statn tyellow" id="ac-stat-overdue" style="font-size:22px">—</div><div class="statl">逾期件數</div></div>
+          </div>
+
+          <!-- 篩選 -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+            <button class="btn ac-filter-btn active" onclick="setAcFilter('all',this)">全部</button>
+            <button class="btn ac-filter-btn" onclick="setAcFilter('待繳',this)">待繳</button>
+            <button class="btn ac-filter-btn" onclick="setAcFilter('已繳',this)">已繳</button>
+            <button class="btn ac-filter-btn" onclick="setAcFilter('逾期',this)">逾期</button>
+          </div>
+
+          <!-- 新增面板 -->
+          <div id="ac-add-panel" style="display:none;margin-bottom:16px" class="card">
+            <div class="ct">新增繳費紀錄</div>
+            <div class="grid2">
+              <div class="fg"><label>繳費項目 *</label><input type="text" id="ac-item" placeholder="例：台灣大哥大電話費"></div>
+              <div class="fg"><label>繳費類別</label>
+                <select id="ac-category">
+                  <option value="">請選擇</option>
+                  <option>水費</option><option>電費</option><option>網路費</option>
+                  <option>房租</option><option>保險費</option><option>稅費</option>
+                  <option>訂閱服務</option><option>其他</option>
+                </select>
+              </div>
+              <div class="fg"><label>繳費金額</label><input type="number" id="ac-amount" placeholder="0" min="0"></div>
+              <div class="fg"><label>幣別</label>
+                <select id="ac-currency">
+                  <option value="TWD">TWD</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="JPY">JPY</option>
+                </select>
+              </div>
+              <div class="fg"><label>繳費對象</label><input type="text" id="ac-target" placeholder="例：台灣電力公司"></div>
+              <div class="fg"><label>繳費方式</label>
+                <select id="ac-method">
+                  <option value="">請選擇</option>
+                  <option>現金</option><option>信用卡</option><option>銀行轉帳</option>
+                  <option>自動扣繳</option><option>其他</option>
+                </select>
+              </div>
+              <div class="fg"><label>繳費日期</label><input type="date" id="ac-date"></div>
+              <div class="fg"><label>截止日期</label><input type="date" id="ac-deadline"></div>
+              <div class="fg"><label>繳費狀態</label>
+                <select id="ac-status">
+                  <option value="待繳">待繳</option>
+                  <option value="已繳">已繳</option>
+                  <option value="逾期">逾期</option>
+                </select>
+              </div>
+            </div>
+            <div class="fg" style="margin-top:10px"><label>備註</label><textarea id="ac-note" rows="2" placeholder="補充說明..."></textarea></div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btnp" id="btn-ac-submit" onclick="submitAccount()">送出</button>
+              <button class="btn" onclick="toggleAddAccount()">取消</button>
+            </div>
+          </div>
+
+          <!-- 列表 -->
+          <div id="ac-list"><div class="empty">載入中...</div></div>
         </div>
 
         <!-- CRM 客戶總覽 -->
@@ -2551,8 +2632,8 @@
 
     // ── API 基礎網址設定 ──────────────────────────────────────
     // 本地伺服器（預設）：保持空字串 ''
-    var hrApiBase  = localStorage.getItem('hrApiBase')  || 'https://shy-sun-7610.seedmediatw.workers.dev';
-    var crmApiBase = localStorage.getItem('crmApiBase') || 'https://round-brook-f2a3.seedmediatw.workers.dev';
+    var hrApiBase  = localStorage.getItem('hrApiBase')  || 'https://hr-system123.seedmediatw.workers.dev';
+    var crmApiBase = localStorage.getItem('crmApiBase') || 'https://crm-system456.seedmediatw.workers.dev';
     function activeApiBase() { return pendingSystem === 'crm' ? crmApiBase : hrApiBase; }
   // --- CRM Variables ---
   var CRM_DATA = [];
@@ -2572,7 +2653,7 @@
     var aiOpen = false;
     var AVCOLS = [['#E6F1FB', '#0C447C'], ['#E1F5EE', '#085041'], ['#FAEEDA', '#633806'], ['#EEEDFE', '#3C3489'], ['#FAECE7', '#712B13'], ['#EAF3DE', '#27500A']];
     var CATS = ['交通費', '餐費', '住宿費', '材料費', '軟體訂閱', '培訓費', '其他'];
-    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', interview:'面試管理', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄', 'crm-batch': '批次 AI 匯入' };
+    var PAGE_TITLES = { dashboard:'總覽', leave:'請假申請', expense:'報帳申請', onboarding:'員工入職', checkin:'員工簽到', tracker:'審核追蹤', accounts:'繳費紀錄', interview:'面試管理', settings:'Notion 設定', 'crm-dashboard': '客戶總覽', 'crm-add': '新增客戶', 'crm-update': '更新客戶', 'crm-callreport': '拜訪記錄', 'crm-batch': '批次 AI 匯入' };
     var BATCH_ITEMS = [];
 
     // ── Navigation ─────────────────────────────────────────
@@ -2595,6 +2676,7 @@
     if (id === 'crm-dashboard') loadClients();
     if (id === 'crm-update' || id === 'crm-callreport') populateClientSelects();
       if (id === 'tracker') loadNotionData();
+      if (id === 'accounts') loadAccounts();
       if (id === 'interview') loadInterviewees();
       if (id === 'expense') loadExpenseHistory();
       // 手機版：選完頁面後自動關閉選單
@@ -3513,6 +3595,149 @@
       });
   }
 
+
+  // ── Accounts（繳費紀錄）──────────────────────────────────────
+  var AC_DATA = [];
+  var _acFilter = 'all';
+
+  function toggleAddAccount() {
+    var panel = document.getElementById('ac-add-panel');
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  }
+
+  function loadAccounts() {
+    if (!nDBs.accounts) {
+      document.getElementById('ac-list').innerHTML = '<div class="empty">請先在設定頁填入繳費紀錄 Database ID（或重新登入以取得）</div>';
+      return;
+    }
+    document.getElementById('ac-list').innerHTML = '<div class="empty">載入中...</div>';
+    fetch(hrApiBase + '/api/hr/databases/' + nDBs.accounts + '/query', {
+      method: 'POST', headers: hrH(),
+      body: JSON.stringify({ sorts: [{ property: '截止日期', direction: 'ascending' }] })
+    }).then(function(r){ return r.json(); })
+      .then(function(data){
+        if (!data.results) { document.getElementById('ac-list').innerHTML = '<div class="empty">讀取失敗</div>'; return; }
+        AC_DATA = data.results.map(function(p){
+          var pr = p.properties;
+          return {
+            id:       p.id,
+            item:     gp(pr, '繳費項目', 'title') || '未命名',
+            category: gp(pr, '繳費類別', 'select') || '',
+            status:   gp(pr, '繳費狀態', 'select') || '',
+            method:   gp(pr, '繳費方式', 'select') || '',
+            amount:   pr['繳費金額'] && pr['繳費金額'].number != null ? pr['繳費金額'].number : null,
+            currency: gp(pr, '幣別', 'select') || 'TWD',
+            date:     gp(pr, '繳費日期', 'date') || '',
+            deadline: gp(pr, '截止日期', 'date') || '',
+            target:   gp(pr, '繳費對象', 'text') || '',
+            note:     gp(pr, '備註', 'text') || ''
+          };
+        });
+        updateAcStats();
+        renderAccounts();
+      }).catch(function(){ document.getElementById('ac-list').innerHTML = '<div class="empty">網路錯誤</div>'; });
+  }
+
+  function updateAcStats() {
+    document.getElementById('ac-stat-pending').textContent  = AC_DATA.filter(function(r){ return r.status === '待繳'; }).length;
+    document.getElementById('ac-stat-paid').textContent     = AC_DATA.filter(function(r){ return r.status === '已繳'; }).length;
+    document.getElementById('ac-stat-overdue').textContent  = AC_DATA.filter(function(r){ return r.status === '逾期'; }).length;
+  }
+
+  function setAcFilter(f, el) {
+    _acFilter = f;
+    document.querySelectorAll('.ac-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    renderAccounts();
+  }
+
+  function renderAccounts() {
+    var listEl = document.getElementById('ac-list');
+    var filtered = AC_DATA.filter(function(r){
+      return _acFilter === 'all' || r.status === _acFilter;
+    });
+    if (!filtered.length) { listEl.innerHTML = '<div class="empty">沒有符合條件的紀錄</div>'; return; }
+    var SC = { '待繳':'tred', '已繳':'tgreen', '逾期':'tyellow' };
+    listEl.innerHTML = '<div class="card" style="padding:0 24px">' +
+      filtered.map(function(r){
+        var amtStr = r.amount != null ? r.currency + ' ' + r.amount.toLocaleString() : '—';
+        return '<div class="client-row" style="flex-direction:column;align-items:stretch;gap:6px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+            '<div>' +
+              '<div class="client-name">' + esc(r.item) +
+                (r.category ? ' <small style="font-weight:400;color:var(--text2)">· ' + esc(r.category) + '</small>' : '') +
+              '</div>' +
+              '<div class="client-meta">' +
+                (r.target   ? '對象：' + esc(r.target) + '　' : '') +
+                (r.method   ? '方式：' + esc(r.method) + '　' : '') +
+                (r.deadline ? '截止：' + esc(r.deadline) : '') +
+              '</div>' +
+            '</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+              '<strong style="font-size:14px">' + esc(amtStr) + '</strong>' +
+              (r.status ? '<span class="tag ' + (SC[r.status]||'tgray') + '">' + esc(r.status) + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+            '<select onchange="acUpdateStatus(\'' + r.id + '\',this.value)" style="font-size:12px;padding:3px 8px;border-radius:6px;border:1px solid var(--border)">' +
+              '<option value="">— 更新狀態 —</option>' +
+              ['待繳','已繳','逾期'].map(function(s){ return '<option value="' + s + '"' + (r.status===s?' selected':'') + '>' + s + '</option>'; }).join('') +
+            '</select>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function acUpdateStatus(pageId, status) {
+    if (!status) return;
+    fetch(hrApiBase + '/api/hr/pages/' + pageId, {
+      method: 'PATCH', headers: hrH(),
+      body: JSON.stringify({ properties: { '繳費狀態': { select: { name: status } } } })
+    }).then(function(r){
+      if (r.ok) { showToast('狀態已更新為「' + status + '」', 'ok'); loadAccounts(); }
+      else showToast('更新失敗', 'err');
+    }).catch(function(){ showToast('網路錯誤', 'err'); });
+  }
+
+  function submitAccount() {
+    var item = document.getElementById('ac-item').value.trim();
+    if (!item) { showToast('請填寫繳費項目', 'err'); return; }
+    if (!nDBs.accounts) { showToast('未設定繳費紀錄 Database ID', 'err'); return; }
+    var btn = document.getElementById('btn-ac-submit');
+    btn.disabled = true; btn.textContent = '送出中...';
+    var props = {
+      '繳費項目':  { title: rt(item) },
+      '繳費類別':  { select: { name: document.getElementById('ac-category').value || '其他' } },
+      '繳費狀態':  { select: { name: document.getElementById('ac-status').value || '待繳' } },
+      '幣別':      { select: { name: document.getElementById('ac-currency').value || 'TWD' } },
+      '備註':      { rich_text: rt(document.getElementById('ac-note').value) },
+    };
+    var amt = document.getElementById('ac-amount').value;
+    if (amt) props['繳費金額'] = { number: parseFloat(amt) };
+    var target = document.getElementById('ac-target').value.trim();
+    if (target) props['繳費對象'] = { rich_text: rt(target) };
+    var method = document.getElementById('ac-method').value;
+    if (method) props['繳費方式'] = { select: { name: method } };
+    var date = document.getElementById('ac-date').value;
+    if (date) props['繳費日期'] = { date: { start: date } };
+    var deadline = document.getElementById('ac-deadline').value;
+    if (deadline) props['截止日期'] = { date: { start: deadline } };
+    fetch(hrApiBase + '/api/hr/pages', {
+      method: 'POST', headers: hrH(),
+      body: JSON.stringify({ parent: { database_id: nDBs.accounts }, properties: props })
+    }).then(function(r){
+      if (r.ok) {
+        showToast('繳費紀錄已新增！', 'ok');
+        toggleAddAccount();
+        ['ac-item','ac-amount','ac-target','ac-note','ac-date','ac-deadline'].forEach(function(id){ document.getElementById(id).value = ''; });
+        loadAccounts();
+      } else {
+        r.json().then(function(e){ showToast('新增失敗：' + (e.message||'未知錯誤'), 'err'); });
+      }
+    }).catch(function(){ showToast('網路錯誤', 'err'); })
+    .finally(function(){ btn.disabled = false; btn.textContent = '送出'; });
+  }
 
   // ── Interview ──────────────────────────────────────────────
   var IV_DATA = [];
