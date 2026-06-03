@@ -3347,7 +3347,7 @@
       if (type === 'leave') {
         msg = '📋 新請假申請\n員工：' + data.name + '　假別：' + data.type
             + '\n日期：' + data.start + ' ～ ' + data.end + '（' + data.days + ' 天）'
-            + (data.reason ? '\n原因：' + data.reason : '');
+            + '\n備註：' + (data.reason || '—');
       } else if (type === 'expense') {
         var cats = data.items.map(function(i){ return i.cat; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).join('、');
         msg = '💰 新報帳申請\n員工：' + data.name + '　金額：NT$' + Math.round(data.total).toLocaleString()
