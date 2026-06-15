@@ -481,52 +481,6 @@ async function handleDailyInterview(env) {
   );
 }
 
-// ── 每週一面試進度總覽 ────────────────────────────────────────
-
-async function handleWeeklyInterview(env) {
-  const token = env.LINE_CHANNEL_TOKEN;
-  const groupId = env.LINE_GROUP_ID;
-  if (!token || !groupId || !env.HR_TOKEN || !env.DB_INTERVIEW) return;
-
-  const pad = n => String(n).padStart(2, '0');
-  const now = new Date();
-  const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
-
-  // 查詢尚未完成的候選人（不含「評分完成」）
-  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_INTERVIEW}/query`, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      filter: {
-        or: [
-          { property: '面試階段', select: { equals: '約面試' } },
-          { property: '面試階段', select: { equals: '筆試' } },
-          { property: '面試階段', select: { equals: '主管面試' } },
-        ]
-      },
-      sorts: [{ property: '應徵時間', direction: 'ascending' }],
-    }),
-  });
-  const data = await res.json();
-  const records = data.results || [];
-  if (records.length === 0) {
-    await sendLine(token, groupId, `📋 本週面試進度（${today}）\n\n目前無進行中的面試候選人 ✓`);
-    return;
-  }
-
-  const lines = records.map(r => {
-    const pr = r.properties;
-    const name     = pr['姓名']?.title?.[0]?.plain_text || '未知';
-    const position = pr['應徵職務']?.select?.name || '';
-    const stage    = pr['面試階段']?.select?.name || '';
-    const date     = pr['面試日期']?.date?.start || '';
-    return `• ${name}${position ? '（' + position + '）' : ''}　${stage}${date ? '　' + date : ''}`;
-  });
-  await sendLine(token, groupId,
-    `📋 本週面試進度（${today}）\n共 ${records.length} 位候選人進行中\n\n${lines.join('\n')}`
-  );
-}
-
 // ── 每日請假通知 ──────────────────────────────────────────────
 
 async function handleDailyLeave(env) {
@@ -609,10 +563,5 @@ export default {
     // 每天：請假通知 + 今日面試提醒
     ctx.waitUntil(handleDailyLeave(env));
     ctx.waitUntil(handleDailyInterview(env));
-
-    // 每週一：面試進度週報
-    if (taiwanDay === 1) {
-      ctx.waitUntil(handleWeeklyInterview(env));
-    }
   },
 };
