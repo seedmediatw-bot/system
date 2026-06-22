@@ -501,15 +501,23 @@ async function handleWeeklyInterview(env) {
     headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
     body: JSON.stringify({
       filter: {
-        and: [
-          { property: '應徵時間', date: { on_or_after: sinceStr } },
+        or: [
+          // 條件一：近 60 天內應徵，且尚未完成
           {
-            or: [
-              { property: '面試階段', select: { equals: '約面試' } },
-              { property: '面試階段', select: { equals: '筆試' } },
-              { property: '面試階段', select: { equals: '主管面試' } },
+            and: [
+              { property: '應徵時間', date: { on_or_after: sinceStr } },
+              {
+                or: [
+                  { property: '面試階段', select: { equals: '約面試' } },
+                  { property: '面試階段', select: { equals: '筆試' } },
+                  { property: '面試階段', select: { equals: '主管面試' } },
+                ]
+              }
             ]
-          }
+          },
+          // 條件二：已取得面試機會（筆試或主管面試），不管應徵時間
+          { property: '面試階段', select: { equals: '筆試' } },
+          { property: '面試階段', select: { equals: '主管面試' } },
         ]
       },
       sorts: [{ property: '面試階段', direction: 'ascending' }],
