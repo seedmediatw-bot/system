@@ -491,57 +491,60 @@ async function handleWeeklyInterview(env) {
   const pad = n => String(n).padStart(2, '0');
   const now = new Date();
   const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
+  const fmtDate = d => d ? `${d.slice(5,7)}/${d.slice(8,10)}` : '';
 
-  // 只撈 60 天內應徵的候選人，避免舊資料干擾
-  const since = new Date(now.getTime() - 60 * 86400000);
-  const sinceStr = `${since.getUTCFullYear()}-${pad(since.getUTCMonth()+1)}-${pad(since.getUTCDate())}`;
-
+  // 只撈「內部過濾日期」有填的候選人（人工審核過的名單）
   const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_INTERVIEW}/query`, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      filter: {
-        or: [
-          // 條件一：近 60 天內應徵，且尚未完成
-          {
-            and: [
-              { property: '應徵時間', date: { on_or_after: sinceStr } },
-              {
-                or: [
-                  { property: '面試階段', select: { equals: '約面試' } },
-                  { property: '面試階段', select: { equals: '筆試' } },
-                  { property: '面試階段', select: { equals: '主管面試' } },
-                ]
-              }
-            ]
-          },
-          // 條件二：已取得面試機會（筆試或主管面試），不管應徵時間
-          { property: '面試階段', select: { equals: '筆試' } },
-          { property: '面試階段', select: { equals: '主管面試' } },
-        ]
-      },
-      sorts: [{ property: '面試階段', direction: 'ascending' }],
+      filter: { property: '內部過濾日期', date: { is_not_empty: true } },
+      sorts: [{ property: '內部過濾日期', direction: 'ascending' }],
+      page_size: 100,
     }),
   });
   const data = await res.json();
   const records = data.results || [];
 
-  if (records.length === 0) {
-    await sendLine(token, groupId, `📋 本週面試進度（${today}）\n\n近 60 天內無進行中的候選人 ✓`);
-    return;
-  }
+  // 四個職缺顯示順序
+  const positions = [
+    'AI 內容創作企畫（ AI 應用 / 自動化）(培訓)',
+    '影像內容製作（影像／短影音／AI應用）（培訓轉正）',
+    '影片拍攝剪輯',
+    '工讀生（文書／攝影協助）',
+  ];
 
-  const lines = records.map(r => {
+  // 依應徵職務分組
+  const groups = {};
+  for (const r of records) {
     const pr = r.properties;
     const name     = pr['姓名']?.title?.[0]?.plain_text || '未知';
-    const position = pr['應徵職務']?.rich_text?.[0]?.plain_text || pr['應徵職務']?.select?.name || '';
-    const stage    = pr['面試階段']?.select?.name || '';
-    const date     = pr['面試日期']?.date?.start || '';
-    return `• ${name}${position ? '（' + position + '）' : ''}　${stage}${date ? '　' + date : ''}`;
+    const position = pr['應徵職務']?.rich_text?.[0]?.plain_text || pr['應徵職務']?.select?.name || '其他';
+    const applyDate  = fmtDate(pr['應徵時間']?.date?.start || '');
+    const filterDate = fmtDate(pr['內部過濾日期']?.date?.start || '');
+    const line = `• ${name}${applyDate ? '　投遞 ' + applyDate : ''}${filterDate ? '　內部過濾 ' + filterDate : ''}`;
+    if (!groups[position]) groups[position] = [];
+    groups[position].push(line);
+  }
+
+  const sections = positions.map(pos => {
+    const candidates = groups[pos] || [];
+    const header = `【${pos}】`;
+    return candidates.length > 0
+      ? header + '\n' + candidates.join('\n')
+      : header + '\n（本週無候選人）';
   });
 
+  // 其他職缺（不在四個固定職缺內）
+  for (const [pos, lines] of Object.entries(groups)) {
+    if (!positions.includes(pos)) {
+      sections.push(`【${pos}】\n${lines.join('\n')}`);
+    }
+  }
+
+  const total = records.length;
   await sendLine(token, groupId,
-    `📋 本週面試進度（${today}）\n近 60 天內共 ${records.length} 位進行中\n\n${lines.join('\n')}`
+    `📋 本週面試追蹤（${today}）\n共 ${total} 位候選人\n\n${sections.join('\n\n')}`
   );
 }
 
