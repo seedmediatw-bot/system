@@ -3669,12 +3669,8 @@
       filtered.map(function(r){
         var amtStr = r.amount != null ? r.currency + ' ' + r.amount.toLocaleString() : '—';
         var nc = NC[r.nature];
-        var rowStyle = nc
-          ? 'border-left:4px solid ' + nc.border + ';background:' + nc.bg + ';'
-          : '';
-        var natureTag = nc
-          ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + nc.border + ';color:' + nc.tag + ';font-weight:600">' + nc.label + '</span>'
-          : '';
+        var rowStyle = nc ? 'border-left:4px solid ' + nc.border + ';background:' + nc.bg + ';' : '';
+        var natureTag = nc ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + nc.border + ';color:' + nc.tag + ';font-weight:600">' + nc.label + '</span>' : '';
         return '<div class="client-row" style="flex-direction:column;align-items:stretch;gap:6px;' + rowStyle + '">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
             '<div>' +
@@ -4741,4 +4737,29 @@
     ['add-name','add-amount','add-lastdate','add-nextdate','add-action','add-commitment','add-notes','add-ai-input'].forEach(function(id){
       var el = document.getElementById(id); if (el) el.value = '';
     });
-    ['add-status','
+    ['add-status','add-priority','add-reaction','add-contact'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('add-ai-status').textContent = '';
+    _files.add = []; renderThumbs('add');
+  }
+
+
+
+  // ── 設定 ───────────────────────────────────────────────────
+  
+  // ── Init ────────────────────────────────────────────────
+    // 檢查 Worker 狀態
+    fetch(hrApiBase + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
+      if (s.ok) {
+        document.getElementById('ndot').className = 'ndot on';
+        document.getElementById('nlabel').textContent = '已連接 Worker';
+      }
+    }).catch(function () { });
+    updateNotionUI();
+    document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+    // Deploy Trigger: 2026-05-12
+  </script>
+</body>
+
+</html>
