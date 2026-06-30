@@ -2014,6 +2014,8 @@
             <button class="btn ac-filter-btn" onclick="setAcFilter('待繳',this)">待繳</button>
             <button class="btn ac-filter-btn" onclick="setAcFilter('已繳',this)">已繳</button>
             <button class="btn ac-filter-btn" onclick="setAcFilter('逾期',this)">逾期</button>
+            <button class="btn ac-filter-btn" onclick="setAcFilter('公司',this)" style="background:#dbeafe;color:#1d4ed8;border-color:#93c5fd">公司</button>
+            <button class="btn ac-filter-btn" onclick="setAcFilter('私人',this)" style="background:#fce7f3;color:#be185d;border-color:#f9a8d4">私人</button>
           </div>
 
           <!-- 新增面板 -->
@@ -3630,7 +3632,8 @@
             date:     gp(pr, '繳費日期', 'date') || '',
             deadline: gp(pr, '截止日期', 'date') || '',
             target:   gp(pr, '繳費對象', 'text') || '',
-            note:     gp(pr, '備註', 'text') || ''
+            note:     gp(pr, '備註', 'text') || '',
+            nature:   gp(pr, '費用性質', 'select') || ''
           };
         });
         updateAcStats();
@@ -3654,14 +3657,25 @@
   function renderAccounts() {
     var listEl = document.getElementById('ac-list');
     var filtered = AC_DATA.filter(function(r){
-      return _acFilter === 'all' || r.status === _acFilter;
+      if (_acFilter === 'all') return true;
+      if (_acFilter === '公司' || _acFilter === '私人') return r.nature === _acFilter;
+      return r.status === _acFilter;
     });
     if (!filtered.length) { listEl.innerHTML = '<div class="empty">沒有符合條件的紀錄</div>'; return; }
     var SC = { '待繳':'tred', '已繳':'tgreen', '逾期':'tyellow' };
+    var NC = { '公司': { border:'#93c5fd', bg:'#eff6ff', tag:'#1d4ed8', label:'公司' },
+               '私人': { border:'#f9a8d4', bg:'#fdf2f8', tag:'#be185d', label:'私人' } };
     listEl.innerHTML = '<div class="card" style="padding:0 24px">' +
       filtered.map(function(r){
         var amtStr = r.amount != null ? r.currency + ' ' + r.amount.toLocaleString() : '—';
-        return '<div class="client-row" style="flex-direction:column;align-items:stretch;gap:6px">' +
+        var nc = NC[r.nature];
+        var rowStyle = nc
+          ? 'border-left:4px solid ' + nc.border + ';background:' + nc.bg + ';'
+          : '';
+        var natureTag = nc
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + nc.border + ';color:' + nc.tag + ';font-weight:600">' + nc.label + '</span>'
+          : '';
+        return '<div class="client-row" style="flex-direction:column;align-items:stretch;gap:6px;' + rowStyle + '">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
             '<div>' +
               '<div class="client-name">' + esc(r.item) +
@@ -3674,6 +3688,7 @@
               '</div>' +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+              natureTag +
               '<strong style="font-size:14px">' + esc(amtStr) + '</strong>' +
               (r.status ? '<span class="tag ' + (SC[r.status]||'tgray') + '">' + esc(r.status) + '</span>' : '') +
             '</div>' +
@@ -4726,29 +4741,4 @@
     ['add-name','add-amount','add-lastdate','add-nextdate','add-action','add-commitment','add-notes','add-ai-input'].forEach(function(id){
       var el = document.getElementById(id); if (el) el.value = '';
     });
-    ['add-status','add-priority','add-reaction','add-contact'].forEach(function(id){
-      var el = document.getElementById(id); if (el) el.selectedIndex = 0;
-    });
-    document.getElementById('add-ai-status').textContent = '';
-    _files.add = []; renderThumbs('add');
-  }
-
-
-
-  // ── 設定 ───────────────────────────────────────────────────
-  
-  // ── Init ────────────────────────────────────────────────
-    // 檢查 Worker 狀態
-    fetch(hrApiBase + '/api/status').then(function (r) { return r.json(); }).then(function (s) {
-      if (s.ok) {
-        document.getElementById('ndot').className = 'ndot on';
-        document.getElementById('nlabel').textContent = '已連接 Worker';
-      }
-    }).catch(function () { });
-    updateNotionUI();
-    document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
-    // Deploy Trigger: 2026-05-12
-  </script>
-</body>
-
-</html>
+    ['add-status','
