@@ -374,6 +374,7 @@ const YEAR = 2026;
    Sam 整理後在 Notion 把該筆狀態改「已整理」，即從頁面消失
    ============================================================ */
 const MEMO_API = "https://hr-system123.seedmediatw.workers.dev";
+const TALKS_API = "https://crm-system456.seedmediatw.workers.dev";
 const MEMO_KEY = "smk_d647fc5cda8f21dbd953c780";
 
 /* ============================================================
@@ -535,7 +536,7 @@ async function loadTalks(){
   const box = document.getElementById("talks");
   const closedBox = document.getElementById("closed-items");
   try{
-    const res = await fetch(MEMO_API + "/api/talks", { headers: { "X-Memo-Key": MEMO_KEY } });
+    const res = await fetch(TALKS_API + "/api/crm/talks", { headers: { "X-Memo-Key": MEMO_KEY } });
     if(!res.ok) throw new Error(res.status);
     const { talks } = await res.json();
     const named = talks.filter(t => t.name);
