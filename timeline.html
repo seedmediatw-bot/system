@@ -2,6 +2,13 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
+<script>
+/* 永久防快取：每次開啟自動導向帶時間戳的唯一網址，確保永遠是最新版。
+   （帶 v= 就不再重導，避免無限迴圈） */
+if(!/[?&]v=/.test(location.search)){
+  location.replace(location.pathname + "?v=" + Date.now() + location.hash);
+}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
