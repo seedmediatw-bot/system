@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>種子娛樂進度時間軸</title>
+<style>
+  :root{
+    --ink:#1a1a1a;
+    --sub:#8a8a8a;
+    --line:#e2e2e2;
+    --accent:#2c2c2c;
+    --deyu:#4a7c59;
+    --dbs:#3b5b8c;
+    --seed:#a4682a;
+    --auto:#7a5aa0;
+    --warn:#b0752b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    color:var(--ink);
+    background:#fdfdfc;
+    line-height:1.75;
+    padding:72px 24px 96px;
+  }
+  .wrap{max-width:720px;margin:0 auto;}
+
+  header h1{font-size:1.6rem;font-weight:600;letter-spacing:.06em;}
+  header p{color:var(--sub);font-size:.85rem;margin-top:8px;letter-spacing:.04em;}
+  .updated{color:var(--sub);font-size:.78rem;margin-top:4px;}
+
+  /* 篩選 */
+  .filters{margin:40px 0 8px;display:flex;gap:8px;flex-wrap:wrap;}
+  .filters button{
+    border:1px solid var(--line);background:none;border-radius:999px;
+    padding:4px 14px;font-size:.78rem;color:var(--sub);cursor:pointer;
+    font-family:inherit;letter-spacing:.05em;transition:.15s;
+  }
+  .filters button.on{border-color:var(--ink);color:var(--ink);}
+
+  /* ===== 區塊（可收合、可拖曳） ===== */
+  section.block{margin-top:56px;}
+  .bhead{
+    display:flex;align-items:center;gap:10px;
+    padding-bottom:12px;border-bottom:1px solid var(--line);
+  }
+  .bhead h2{font-size:1.05rem;font-weight:600;letter-spacing:.08em;}
+  .bhead .sub-note{font-size:.72rem;color:var(--sub);font-weight:400;letter-spacing:.05em;}
+  .drag-handle{
+    cursor:grab;color:#555;font-size:.9rem;user-select:none;
+    line-height:1;padding:2px 2px 2px 0;
+  }
+  .drag-handle:active{cursor:grabbing;}
+  .toggle-btn{
+    margin-left:auto;flex-shrink:0;
+    border:1px solid #aaa;background:none;border-radius:4px;
+    width:22px;height:22px;font-size:.85rem;line-height:1;color:#444;
+    cursor:pointer;font-family:inherit;transition:.15s;
+  }
+  .toggle-btn:hover{border-color:var(--ink);color:var(--ink);}
+  section.block.collapsed .bbody{display:none;}
+  section.block.drag-over{border-top:2px solid var(--accent);}
+  section.block.dragging{opacity:.4;}
+
+  /* 閱讀方向指示 */
+  .direction{
+    margin-top:28px;display:flex;align-items:center;gap:12px;
+    padding-left:120px;color:var(--sub);
+  }
+  .direction svg{flex-shrink:0;}
+  .direction span{font-size:.75rem;letter-spacing:.12em;}
+
+  /* 時間軸 */
+  .timeline{margin-top:12px;position:relative;}
+  .timeline::before{
+    content:"";position:absolute;left:96px;top:0;bottom:0;width:1px;background:var(--line);
+  }
+  .entry{
+    display:flex;gap:32px;padding:12px 0;position:relative;
+  }
+  .entry .date{
+    width:64px;flex-shrink:0;text-align:right;
+    font-size:.82rem;color:var(--sub);font-variant-numeric:tabular-nums;
+    padding-top:16px;letter-spacing:.03em;
+  }
+  .entry .dot{
+    position:absolute;left:92.5px;top:36px;width:8px;height:8px;border-radius:50%;
+    background:#fdfdfc;border:1.5px solid var(--accent);
+  }
+  .entry.cat-deyu .dot{border-color:var(--deyu);}
+  .entry.cat-dbs  .dot{border-color:var(--dbs);}
+  .entry.cat-seed .dot{border-color:var(--seed);}
+  .entry .body{
+    margin-left:24px;flex:1;
+    padding:14px 18px;border-radius:8px;
+    background:#f6f6f4;
+  }
+  .entry.cat-deyu .body{background:#f0f6f2;}
+  .entry.cat-dbs  .body{background:#eff3f9;}
+  .entry.cat-seed .body{background:#f9f3ec;}
+  .entry .title{font-size:.95rem;font-weight:500;}
+  .entry .note{font-size:.85rem;color:#555;margin-top:4px;}
+  .entry .decided{font-size:.8rem;margin-top:6px;color:var(--deyu);}
+  .entry .decided::before{content:"✓ 已定案　";letter-spacing:.05em;}
+  .entry .pending{font-size:.8rem;margin-top:6px;color:var(--warn);}
+  .entry .pending::before{content:"… 待回覆　";letter-spacing:.05em;}
+
+  /* 時間軸終點（最新） */
+  .tl-end{
+    display:flex;align-items:center;gap:12px;padding:14px 0 0 120px;color:var(--sub);
+  }
+  .tl-end span{font-size:.72rem;letter-spacing:.12em;}
+
+  .tag{
+    display:inline-block;font-size:.68rem;letter-spacing:.08em;
+    padding:1px 8px;border-radius:3px;margin-left:10px;vertical-align:2px;
+  }
+  .tag.deyu{color:var(--deyu);background:#eef4f0;}
+  .tag.dbs{color:var(--dbs);background:#edf1f7;}
+  .tag.seed{color:var(--seed);background:#f7f1ea;}
+  .tag.auto{color:var(--auto);background:#f2eef7;}
+
+  /* 洽談中 */
+  .talk{
+    display:grid;grid-template-columns:190px 1fr;gap:0 20px;
+    padding:14px 18px;margin-top:14px;border-radius:8px;background:#f6f6f4;
+    align-items:start;cursor:pointer;position:relative;
+  }
+  .talk .name{font-size:.92rem;font-weight:500;line-height:1.6;padding-right:20px;}
+  .talk .status-chip{
+    display:inline-block;font-size:.68rem;letter-spacing:.08em;
+    padding:1px 8px;border-radius:3px;margin-top:6px;
+  }
+  .talk .now{font-size:.85rem;color:#555;}
+  .talk .now .meta{font-size:.75rem;color:var(--sub);margin-top:4px;letter-spacing:.03em;}
+  .talk .late{color:var(--warn);}
+  .st-quoted{color:#1A5276;background:#D6EAF8;}
+  .st-mou{color:#6C3483;background:#E8DAEF;}
+  .st-willing{color:#9A7D0A;background:#FDEBD0;}
+  .st-follow{color:#616A6B;background:#ECECEA;}
+
+  /* 客戶展開箭頭 */
+  .talk .chev{
+    position:absolute;top:16px;right:16px;color:#c0c0bc;font-size:.75rem;
+    transition:transform .15s;
+  }
+  .talk.open .chev{transform:rotate(90deg);}
+
+  /* 客戶展開內容：迷你時間軸 → 概況說明 */
+  .talk .detail{display:none;grid-column:1/-1;margin-top:12px;}
+  .talk.open .detail{display:block;}
+  .hist{border-left:1px solid #dcdcd8;padding-left:16px;margin-left:2px;}
+  .hist .h-item{font-size:.8rem;color:#555;padding:3px 0;}
+  .hist .h-date{color:var(--sub);font-variant-numeric:tabular-nums;margin-right:10px;letter-spacing:.03em;}
+  .overview{
+    margin-top:14px;padding:12px 16px;background:#fdfdfc;
+    border:1px solid var(--line);border-radius:6px;
+    font-size:.84rem;color:#444;
+  }
+  .overview .ov-label{
+    display:block;font-size:.7rem;letter-spacing:.14em;
+    color:var(--sub);margin-bottom:4px;
+  }
+
+  @media (max-width:560px){
+    .talk{grid-template-columns:1fr;gap:8px 0;}
+  }
+
+  /* 同事備忘 */
+  .memo-form{margin-top:16px;}
+  .memo-names{display:flex;gap:8px;flex-wrap:wrap;}
+  .memo-names button{
+    border:1px solid var(--line);background:none;border-radius:999px;
+    padding:3px 14px;font-size:.8rem;color:var(--sub);cursor:pointer;
+    font-family:inherit;letter-spacing:.05em;transition:.15s;
+  }
+  .memo-names button.on{border-color:var(--ink);color:var(--ink);}
+  .memo-form textarea{
+    width:100%;margin-top:10px;padding:10px 14px;
+    border:1px solid var(--line);border-radius:8px;background:#fff;
+    font-family:inherit;font-size:.85rem;color:var(--ink);line-height:1.7;
+    resize:vertical;outline:none;
+  }
+  .memo-form textarea:focus{border-color:#aaa;}
+  .memo-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:8px;}
+  .memo-status{font-size:.78rem;color:var(--sub);}
+  .memo-status.err{color:var(--warn);}
+  #memo-send{
+    border:1px solid #555;background:none;border-radius:6px;
+    padding:4px 18px;font-size:.82rem;color:#333;cursor:pointer;
+    font-family:inherit;letter-spacing:.08em;transition:.15s;
+  }
+  #memo-send:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
+  #memo-send:disabled{opacity:.4;cursor:default;}
+  .memo-item{
+    padding:10px 16px;margin-top:12px;border-radius:8px;
+    background:#f6f6f4;font-size:.85rem;color:#444;
+  }
+  .memo-item .m-meta{font-size:.75rem;color:var(--sub);margin-right:10px;letter-spacing:.03em;}
+
+  /* 個人自動化工程 */
+  .auto-item{
+    padding:14px 18px;margin-top:14px;border-radius:8px;
+    background:#f4f0f8;
+  }
+  .auto-item .t{font-size:.92rem;font-weight:500;}
+  .auto-item .d{font-size:.84rem;color:#555;margin-top:4px;}
+
+  /* 已結案／暫緩 */
+  .closed-item{
+    padding:14px 18px;margin-top:14px;border-radius:8px;
+    background:#f6f6f4;
+  }
+  .closed-item .t{font-size:.92rem;font-weight:500;color:#666;}
+  .closed-item .d{font-size:.84rem;color:#777;margin-top:4px;}
+  .empty-hint{margin-top:14px;font-size:.8rem;color:var(--sub);letter-spacing:.05em;}
+
+  footer{margin-top:80px;color:var(--sub);font-size:.75rem;text-align:center;letter-spacing:.05em;}
+
+  @media (max-width:560px){
+    .timeline::before{left:70px;}
+    .entry{gap:20px;}
+    .entry .date{width:48px;font-size:.75rem;}
+    .entry .dot{left:66.5px;}
+    .entry .body{margin-left:16px;padding:12px 14px;}
+    .direction,.tl-end{padding-left:88px;}
+  }
+  body.locked .wrap{display:none;}
+</style>
+</head>
+<body class="locked">
+<div class="wrap">
+
+  <header>
+    <h1>種子娛樂進度時間軸</h1>
+    <p>全員共同維護・Sam 主視角建置｜掌握每天在做什麼・CRM 何時變化・哪些已明確講好</p>
+    <p class="updated" id="updated"></p>
+  </header>
+
+  <div class="filters" id="filters">
+    <button data-cat="all" class="on">全部</button>
+    <button data-cat="deyu">德育</button>
+    <button data-cat="dbs">星展 DBS</button>
+    <button data-cat="seed">種子內部</button>
+    <button data-cat="talks">洽談中</button>
+  </div>
+
+  <!-- ===== 可收合、可拖曳的區塊容器 ===== -->
+  <div id="blocks">
+
+    <section class="block" data-key="tl" id="tl-block">
+      <div class="bhead">
+        <span class="drag-handle" title="拖曳調整順序">⠿</span>
+        <h2>進度時間軸</h2>
+        <button class="toggle-btn" title="收合／展開">−</button>
+      </div>
+      <div class="bbody">
+        <div class="direction" aria-hidden="true">
+          <svg width="22" height="30" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="11" cy="6" r="4.5" stroke="#8a8a8a" stroke-width="1.4"/>
+            <line x1="11" y1="12" x2="11" y2="24" stroke="#8a8a8a" stroke-width="1.4"/>
+            <path d="M6.5 20.5 L11 25.5 L15.5 20.5" stroke="#8a8a8a" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>時間由上而下・往下即最新</span>
+        </div>
+        <div class="timeline" id="timeline"></div>
+        <div class="tl-end" aria-hidden="true">
+          <svg width="22" height="14" viewBox="0 0 22 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="11" cy="7" r="5" fill="#2c2c2c"/>
+          </svg>
+          <span id="tl-end-label">目前進度</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" data-key="talks" id="talks-block">
+      <div class="bhead">
+        <span class="drag-handle" title="拖曳調整順序">⠿</span>
+        <h2>洽談中 <span class="sub-note">點客戶可展開歷程與概況｜同步自種子創意 CRM</span></h2>
+        <button class="toggle-btn" title="收合／展開">−</button>
+      </div>
+      <div class="bbody"><div id="talks"></div></div>
+    </section>
+
+    <section class="block" data-key="memo" id="memo-block">
+      <div class="bhead">
+        <span class="drag-handle" title="拖曳調整順序">⠿</span>
+        <h2>同事備忘 <span class="sub-note">選名字、打字、送出——Sam 整理後移入正式時間軸</span></h2>
+        <button class="toggle-btn" title="收合／展開">−</button>
+      </div>
+      <div class="bbody">
+        <div class="memo-form">
+          <div class="memo-names" id="memo-names">
+            <button data-n="文娟">文娟</button>
+            <button data-n="志成">志成</button>
+            <button data-n="Sam">Sam</button>
+            <button data-n="俊宏">俊宏</button>
+          </div>
+          <textarea id="memo-input" rows="2" placeholder="想補充的進度、提醒、客戶消息……寫完按送出"></textarea>
+          <div class="memo-actions">
+            <span class="memo-status" id="memo-status"></span>
+            <button id="memo-send">送出</button>
+          </div>
+        </div>
+        <div id="memo-items"></div>
+      </div>
+    </section>
+
+    <section class="block" data-key="auto" id="auto-block">
+      <div class="bhead">
+        <span class="drag-handle" title="拖曳調整順序">⠿</span>
+        <h2>個人自動化工程 <span class="tag auto">AUTO</span></h2>
+        <button class="toggle-btn" title="收合／展開">−</button>
+      </div>
+      <div class="bbody" id="auto-items"></div>
+    </section>
+
+    <section class="block" data-key="closed" id="closed-block">
+      <div class="bhead">
+        <span class="drag-handle" title="拖曳調整順序">⠿</span>
+        <h2>已結案／暫緩 <span class="sub-note">前因後果封存區</span></h2>
+        <button class="toggle-btn" title="收合／展開">−</button>
+      </div>
+      <div class="bbody" id="closed-items"></div>
+    </section>
+
+  </div>
+
+  <footer>種子娛樂・全員共同維護｜此檔案可持續更新</footer>
+</div>
+
+<script>
+/* ============================================================
+   密碼閘門：輸入公司共用密碼才顯示內容（每台裝置記住一次）
+   要改密碼：請 Claude 重算下面的 GATE_HASH
+   ============================================================ */
+const GATE_HASH = "23b05eb9e1f2fe970876f00456e1de5607252b55efe28a4b73b2a4483363b789";
+async function sha256Hex(s){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+(async function gate(){
+  try{
+    if(localStorage.getItem("seedtl.gate") === GATE_HASH){
+      document.body.classList.remove("locked");
+      return;
+    }
+    for(let i = 0; i < 3; i++){
+      const pw = prompt("種子娛樂進度時間軸\n請輸入公司密碼");
+      if(pw === null) break;
+      if(await sha256Hex(pw.trim()) === GATE_HASH){
+        localStorage.setItem("seedtl.gate", GATE_HASH);
+        document.body.classList.remove("locked");
+        return;
+      }
+    }
+    document.querySelector(".wrap").remove();
+    document.body.classList.remove("locked");
+    document.body.innerHTML = '<p style="text-align:center;margin-top:40vh;color:#8a8a8a;font-size:.9rem;">需要密碼才能檢視——請重新整理再試</p>';
+  }catch(e){
+    // 極舊瀏覽器不支援加密 API 時直接顯示（不擋自己人）
+    document.body.classList.remove("locked");
+  }
+})();
+
+/* ============================================================
+   共同維護規則：只改下方「資料區」，不要動後面的程式區。
+   年份設定（跨年時改這裡）
+   ============================================================ */
+const YEAR = 2026;
+
+/* ============================================================
+   同事備忘：直接在網頁上輸入送出，資料存 Notion「🕰️ 時間軸備忘」
+   Sam 整理後在 Notion 把該筆狀態改「已整理」，即從頁面消失
+   ============================================================ */
+const MEMO_API = "https://hr-system123.seedmediatw.workers.dev";
+const MEMO_KEY = "smk_d647fc5cda8f21dbd953c780";
+
+/* ============================================================
+   進度時間軸：在 ENTRIES 加一筆物件即可（位置不拘，自動依日期由舊到新排序）
+   { date:"07-09", cat:"dbs", title:"標題", note:"補充說明（可省略）",
+     decided:"已明確講好的事（可省略）", pending:"還在等的事（可省略）" }
+   cat 可選：deyu（德育）/ dbs（星展）/ seed（種子內部）
+   要加新分類：在 :root 加色票、.tag 加樣式、filters 加按鈕、CATNAME 加名稱
+   ============================================================ */
+const ENTRIES = [
+  { date:"07-08", cat:"seed",
+    title:"文娟姐指出接下來努力方向：內部手冊＋知識圖譜",
+    note:"內部手冊——已自行建立新人手冊並分享給同事一份。知識圖譜——參考中華日報的一張圖譜，但目標做得更簡潔。檔案先以上傳雲端保存為主。",
+    decided:"方向確立：內部手冊、知識圖譜，雲端保存" },
+  { date:"07-08", cat:"dbs",
+    title:"供應商文件初版繳交",
+    note:"上午透過 LINE 繳交 10 份文件（5 Word＋5 PDF）給 Sheeny。",
+    pending:"等星展方通知需補件或修改之處" },
+  { date:"07-06", cat:"dbs",
+    title:"與星展窗口 Sheeny 核對供應商文件細節",
+    note:"下午進行，確認文件格式與內容要求。" },
+  { date:"07-03", cat:"deyu",
+    title:"康養旅遊計畫書推遲",
+    decided:"德育決定計畫書延至 11 月繳交" },
+  { date:"07-01", cat:"deyu",
+    title:"拍攝德育校長、副校長 AI 虛擬分身（HeyGen）",
+    note:"於課程期間完成拍攝與建立。" },
+  { date:"06-29", cat:"deyu",
+    title:"德育 AI 課程（06/29・07/01・07/02 三場完成）",
+    note:"三天課程全數上完。" },
+];
+
+const CATNAME = { deyu:"德育", dbs:"星展 DBS", seed:"種子內部" };
+
+/* ============================================================
+   洽談中：每筆＝{ name, status, st, now, last, overview, history }
+   st 可選：st-quoted（已報價）/ st-mou（MOU待簽）/ st-willing（有意願待簽約）/ st-follow（跟進中）
+   overview＝【概況說明】：前因後果、目前卡點、下一步（看完歷程後接著讀）
+   history＝該客戶歷程，[{ date:"05-14", text:"..." }]，自動依日期由舊到新排序
+   已簽約、結案、暫停的客戶移到下方 CLOSED
+   ============================================================ */
+const TALKS = [
+  { name:"趙婉君 Vivian", status:"MOU 待簽", st:"st-mou",
+    now:"AI 線上課程，學費 35,000/人已達開班門檻。陳院長與郭董自新疆回台後確認開課日，開課日期待定。", last:"—",
+    overview:"AI 線上課程合作。收費（35,000/人）與開班門檻皆已談定，唯一卡點是開課日期——需待陳院長與郭董自新疆回台後拍板。下一步：確認開課日、簽 MOU。",
+    history:[
+      { date:"", text:"AI 線上課程合作成形，學費 35,000/人，報名已達開班門檻" },
+    ]},
+  { name:"尚揚補習班", status:"有意願待簽約", st:"st-willing",
+    now:"三種課程模式（Workshop／企業包班／補習班大班）。5/28 首場活動效果不如預期，待調整後再推進。", last:"05-14",
+    overview:"提供三種課程模式（Workshop／企業包班／補習班大班）。5/28 首場活動成效未達預期，需調整策略後再推進。目前維持關係、等待再啟動時機。",
+    history:[
+      { date:"05-14", text:"最近一次聯繫" },
+      { date:"05-28", text:"首場活動舉行，效果不如預期" },
+    ]},
+  { name:"黃文鴻 Morris｜磐合家族辦公室", status:"已報價", st:"st-quoted",
+    now:"AI 自動化顧問服務規劃已由文娟姐傳給學長，等待回覆；對方目前在美國，待聯絡。", last:"05-19",
+    overview:"標的為 AI 自動化顧問服務。規劃書已由文娟姐轉交學長，對方人在美國，等回覆後再約深談。下一步：待回台後聯絡、安排會面。",
+    history:[
+      { date:"05-19", text:"AI 自動化顧問服務規劃由文娟姐傳給學長" },
+    ]},
+  { name:"獅子會（藝憓學姐）", status:"已報價", st:"st-quoted",
+    now:"AI 品牌力加速計劃已報價，定位免費演講獲客。持續電話追蹤中，場次尚未確定。", last:"05-05",
+    overview:"定位為免費演講獲客、後接 AI 品牌力加速計劃。報價已送出，卡在演講場次未定。下一步：電話持續追蹤，敲定場次。",
+    history:[
+      { date:"05-05", text:"AI 品牌力加速計劃報價送出" },
+    ]},
+  { name:"中華日報（華傳媒）", status:"跟進中", st:"st-follow",
+    now:"戰略夥伴。雙 IP 合作提案（ESG×中道智慧×身心修鍊）已送出，等候陳董事長回覆。", last:"05-29",
+    overview:"戰略夥伴等級。雙 IP 合作提案（ESG×中道智慧×身心修鍊）已送出，等候陳董事長回覆。另：其知識圖譜為種子內部知識圖譜的參考範本。",
+    history:[
+      { date:"05-29", text:"雙 IP 合作提案送出（ESG×中道智慧×身心修鍊）" },
+    ]},
+  { name:"Jerry（親氧機／氫氣機）", status:"跟進中", st:"st-follow",
+    now:"洽談 AI 課程企業包班合作，待安排工廠參觀與會面討論品牌規劃方向。", last:"05-26",
+    overview:"洽談 AI 課程企業包班合作。下一步：安排工廠參觀與會面，討論品牌規劃方向。",
+    history:[
+      { date:"05-26", text:"最近一次聯繫" },
+    ]},
+];
+
+/* ============================================================
+   個人自動化工程（待辦）：{ t:"標題", d:"說明" }
+   ============================================================ */
+const AUTO = [
+  { t:"Claude 成功案例深度調查",
+    d:"請 Claude 產出深度調查提示詞，研究 Claude 的實際成功應用案例。起點：X 上一則用自動交易賺到 84X 美金的推文——可以想見背後失敗了很多次，重點是拆解它怎麼走到成功的。" },
+  { t:"Fable 5 期間的學習衝刺",
+    d:"趁 Fable 5 還能使用的期間，多做成功案例的學習與嘗試，累積自己的自動化工程經驗。" },
+];
+
+/* ============================================================
+   已結案／暫緩：{ name:"客戶", status:"結案｜暫緩", d:"前因後果一句話" }
+   ============================================================ */
+const CLOSED = [
+];
+
+/* ================= 以下為程式區，維護資料不需修改 ================= */
+
+const LATE_DAYS = 7; // 超過幾天未聯繫顯示提醒
+
+function daysSince(mmdd){
+  const m = /^(\d{2})-(\d{2})$/.exec(mmdd);
+  if(!m) return null;
+  const then = new Date(YEAR, +m[1]-1, +m[2]);
+  return Math.floor((Date.now() - then.getTime()) / 86400000);
+}
+
+/* 最後更新：取時間軸最新一筆日期，自動顯示 */
+(function(){
+  const latest = ENTRIES.map(e=>e.date).sort().pop() || "";
+  document.getElementById("updated").textContent = "最後更新：" + YEAR + "-" + latest;
+  document.getElementById("tl-end-label").textContent = "目前進度（" + YEAR + "-" + latest + "）";
+})();
+
+/* 同事備忘：讀取與送出 */
+const memoStatus = (msg, isErr) => {
+  const el = document.getElementById("memo-status");
+  el.textContent = msg || "";
+  el.classList.toggle("err", !!isErr);
+};
+
+function escapeHtml(s){
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+async function loadMemos(){
+  const box = document.getElementById("memo-items");
+  try{
+    const res = await fetch(MEMO_API + "/api/memos", { headers: { "X-Memo-Key": MEMO_KEY } });
+    if(!res.ok) throw new Error(res.status);
+    const { memos } = await res.json();
+    box.innerHTML = memos.length
+      ? memos.map(m => `<div class="memo-item"><span class="m-meta">${(m.date||"").slice(5)}｜${escapeHtml(m.name)}</span>${escapeHtml(m.content)}</div>`).join("")
+      : `<div class="empty-hint">目前沒有新備忘</div>`;
+  }catch(e){
+    box.innerHTML = `<div class="empty-hint">備忘讀取失敗——請從公司網址開啟本頁（本機檔案無法連線）</div>`;
+  }
+}
+loadMemos();
+
+/* 名字選擇（記住上次選誰） */
+(function(){
+  const saved = localStorage.getItem("seedtl.memoName") || "";
+  document.querySelectorAll("#memo-names button").forEach(b=>{
+    if(b.dataset.n === saved) b.classList.add("on");
+    b.addEventListener("click", ()=>{
+      document.querySelectorAll("#memo-names button").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      localStorage.setItem("seedtl.memoName", b.dataset.n);
+    });
+  });
+})();
+
+document.getElementById("memo-send").addEventListener("click", async ()=>{
+  const input = document.getElementById("memo-input");
+  const name = document.querySelector("#memo-names button.on")?.dataset.n;
+  const content = input.value.trim();
+  if(!name){ memoStatus("請先選你的名字", true); return; }
+  if(!content){ memoStatus("內容是空的", true); return; }
+  const btn = document.getElementById("memo-send");
+  btn.disabled = true; memoStatus("送出中…");
+  try{
+    const res = await fetch(MEMO_API + "/api/memo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Memo-Key": MEMO_KEY },
+      body: JSON.stringify({ content, name }),
+    });
+    if(!res.ok) throw new Error(res.status);
+    input.value = "";
+    memoStatus("已送出 ✓");
+    setTimeout(()=>memoStatus(""), 3000);
+    loadMemos();
+  }catch(e){
+    memoStatus("送出失敗，請稍後再試", true);
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+/* 洽談中 */
+function renderTalks(){
+  document.getElementById("talks").innerHTML = TALKS.map((t,i) => {
+    const d = daysSince(t.last);
+    const late = (d !== null && d > LATE_DAYS)
+      ? `<span class="late">・逾 ${d} 天</span>` : "";
+    const hist = (t.history||[]).slice()
+      .sort((a,b)=>(a.date||"").localeCompare(b.date||""))
+      .map(h=>`<div class="h-item"><span class="h-date">${h.date||"—"}</span>${h.text}</div>`).join("");
+    return `
+    <div class="talk" data-i="${i}">
+      <div class="name">${t.name}<br><span class="status-chip ${t.st}">${t.status}</span></div>
+      <div class="now">${t.now}<div class="meta">最近聯繫：${t.last}${late}</div></div>
+      <span class="chev">▶</span>
+      <div class="detail">
+        <div class="hist">${hist || `<div class="h-item">尚未建立歷程</div>`}</div>
+        <div class="overview"><span class="ov-label">概 況 說 明</span>${t.overview||"（待補）"}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+renderTalks();
+document.getElementById("talks").addEventListener("click", ev=>{
+  const card = ev.target.closest(".talk");
+  if(card) card.classList.toggle("open");
+});
+
+/* 自動化工程 */
+document.getElementById("auto-items").innerHTML = AUTO.map(a=>`
+  <div class="auto-item"><div class="t">${a.t}</div><div class="d">${a.d}</div></div>`).join("");
+
+/* 已結案／暫緩 */
+document.getElementById("closed-items").innerHTML = CLOSED.length
+  ? CLOSED.map(c=>`<div class="closed-item"><div class="t">${c.name}｜${c.status}</div><div class="d">${c.d}</div></div>`).join("")
+  : `<div class="empty-hint">尚無結案／暫緩紀錄</div>`;
+
+/* 時間軸 */
+function render(filter){
+  const tl = document.getElementById("timeline");
+  tl.innerHTML = ENTRIES
+    .filter(e => filter === "all" || e.cat === filter)
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .map(e => `
+      <div class="entry cat-${e.cat}">
+        <div class="date">${e.date}</div>
+        <div class="dot"></div>
+        <div class="body">
+          <div class="title">${e.title}<span class="tag ${e.cat}">${CATNAME[e.cat]||e.cat}</span></div>
+          ${e.note ? `<div class="note">${e.note}</div>` : ""}
+          ${e.decided ? `<div class="decided">${e.decided}</div>` : ""}
+          ${e.pending ? `<div class="pending">${e.pending}</div>` : ""}
+        </div>
+      </div>`).join("");
+}
+
+/* 篩選：
+   全部＝所有區塊
+   洽談中＝只顯示洽談中
+   德育/星展/種子內部＝只顯示時間軸（內容依分類過濾）
+   每個頁面的收合狀態互相獨立 */
+let currentCat = "all";
+const VISIBLE = {
+  all:   ["tl","talks","memo","auto","closed"],
+  talks: ["talks"],
+};
+function applyFilter(cat){
+  currentCat = cat;
+  const visible = VISIBLE[cat] || ["tl"];
+  document.querySelectorAll("#blocks > section.block").forEach(sec=>{
+    sec.style.display = visible.includes(sec.dataset.key) ? "" : "none";
+  });
+  if(cat !== "talks") render(cat);
+  applyCollapseState();
+}
+
+document.getElementById("filters").addEventListener("click", ev=>{
+  const b = ev.target.closest("button"); if(!b) return;
+  document.querySelectorAll("#filters button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+  applyFilter(b.dataset.cat);
+});
+
+/* ===== 區塊收合（每個篩選頁面狀態獨立記憶）===== */
+const LS_COLLAPSE = "seedtl.collapsed.v2"; // { 頁面: { 區塊key: 是否收合 } }
+function loadCollapsed(){
+  try{ return JSON.parse(localStorage.getItem(LS_COLLAPSE)) || {}; }catch(e){ return {}; }
+}
+let collapseState = loadCollapsed();
+function pageState(){
+  if(!collapseState[currentCat]) collapseState[currentCat] = { closed:true }; // 預設：已結案／暫緩收合
+  return collapseState[currentCat];
+}
+function applyCollapseState(){
+  const st = pageState();
+  document.querySelectorAll("#blocks > section.block").forEach(sec=>{
+    sec.classList.toggle("collapsed", !!st[sec.dataset.key]);
+    sec.querySelector(".toggle-btn").textContent = st[sec.dataset.key] ? "＋" : "−";
+  });
+}
+(function initCollapse(){
+  document.querySelectorAll("#blocks > section.block").forEach(sec=>{
+    sec.querySelector(".toggle-btn").addEventListener("click", ()=>{
+      const st = pageState();
+      st[sec.dataset.key] = !st[sec.dataset.key];
+      try{ localStorage.setItem(LS_COLLAPSE, JSON.stringify(collapseState)); }catch(e){}
+      applyCollapseState();
+    });
+  });
+})();
+
+/* ===== 區塊拖曳排序（順序記憶）===== */
+const LS_ORDER = "seedtl.order";
+(function initDrag(){
+  const container = document.getElementById("blocks");
+
+  // 還原上次順序
+  try{
+    const order = JSON.parse(localStorage.getItem(LS_ORDER));
+    if(Array.isArray(order)){
+      order.forEach(key=>{
+        const sec = container.querySelector(`section[data-key="${key}"]`);
+        if(sec) container.appendChild(sec);
+      });
+    }
+  }catch(e){}
+
+  let dragging = null;
+
+  container.querySelectorAll("section.block").forEach(sec=>{
+    const handle = sec.querySelector(".drag-handle");
+    handle.addEventListener("mousedown", ()=> sec.setAttribute("draggable","true"));
+    handle.addEventListener("touchstart", ()=> sec.setAttribute("draggable","true"), {passive:true});
+    sec.addEventListener("dragstart", ev=>{
+      dragging = sec;
+      sec.classList.add("dragging");
+      ev.dataTransfer.effectAllowed = "move";
+    });
+    sec.addEventListener("dragend", ()=>{
+      sec.classList.remove("dragging");
+      sec.removeAttribute("draggable");
+      container.querySelectorAll(".drag-over").forEach(x=>x.classList.remove("drag-over"));
+      dragging = null;
+      const order = [...container.querySelectorAll("section.block")].map(s=>s.dataset.key);
+      try{ localStorage.setItem(LS_ORDER, JSON.stringify(order)); }catch(e){}
+    });
+    sec.addEventListener("dragover", ev=>{
+      ev.preventDefault();
+      if(!dragging || dragging === sec) return;
+      container.querySelectorAll(".drag-over").forEach(x=>x.classList.remove("drag-over"));
+      sec.classList.add("drag-over");
+    });
+    sec.addEventListener("drop", ev=>{
+      ev.preventDefault();
+      if(!dragging || dragging === sec) return;
+      const rect = sec.getBoundingClientRect();
+      const before = ev.clientY < rect.top + rect.height/2;
+      container.insertBefore(dragging, before ? sec : sec.nextSibling);
+      sec.classList.remove("drag-over");
+    });
+  });
+})();
+
+applyFilter("all");
+</script>
+</body>
+</html>
