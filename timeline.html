@@ -554,9 +554,13 @@ async function loadTalks(){
     const res = await fetch(TALKS_API + "/api/crm/talks", { headers: { "X-Memo-Key": MEMO_KEY } });
     if(!res.ok) throw new Error(res.status);
     const { talks } = await res.json();
+    // 排序：比照時間軸，依最近聯繫日期由舊到近（上→下）
+    const byDate = (a,b) => (a.last||"").localeCompare(b.last||"");
+    // 結案／暫停／暫緩／已簽約 不算洽談中
+    const CLOSED_ST = ["結案","結束","暫停","暫緩","已簽約"];
     const named = talks.filter(t => t.name);
-    const active = named.filter(t => t.status !== "暫緩" && t.status !== "已簽約");
-    const paused = named.filter(t => t.status === "暫緩");
+    const active = named.filter(t => !CLOSED_ST.includes(t.status)).sort(byDate);
+    const closed = named.filter(t => ["結案","結束","暫停","暫緩"].includes(t.status)).sort(byDate);
     box.innerHTML = active.length ? active.map(t => {
       const d = daysSinceISO(t.last);
       const late = (d !== null && d > LATE_DAYS) ? `<span class="late">・逾 ${d} 天</span>` : "";
@@ -571,9 +575,9 @@ async function loadTalks(){
         </div>
       </div>`;
     }).join("") : `<div class="empty-hint">CRM 目前沒有洽談中客戶</div>`;
-    closedBox.innerHTML = paused.length
-      ? paused.map(t=>`<div class="closed-item"><div class="t">${escapeHtml(t.name)}｜暫緩</div><div class="d">${escapeHtml(t.note||"")}</div></div>`).join("")
-      : `<div class="empty-hint">尚無暫緩紀錄</div>`;
+    closedBox.innerHTML = closed.length
+      ? closed.map(t=>`<div class="closed-item"><div class="t">${escapeHtml(t.name)}｜${escapeHtml(t.status)}</div><div class="d">${escapeHtml(t.note||t.action||"")}</div></div>`).join("")
+      : `<div class="empty-hint">尚無結案／暫緩紀錄</div>`;
   }catch(e){
     box.innerHTML = `<div class="empty-hint">客戶資料讀取失敗——請從公司網址開啟本頁</div>`;
     closedBox.innerHTML = `<div class="empty-hint">—</div>`;
