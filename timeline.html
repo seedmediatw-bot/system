@@ -1,730 +1,701 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<script>
-/* 永久防快取：每次開啟自動導向帶時間戳的唯一網址，確保永遠是最新版。
-   （帶 v= 就不再重導，避免無限迴圈） */
-if(!/[?&]v=/.test(location.search)){
-  location.replace(location.pathname + "?v=" + Date.now() + location.hash);
+/**
+ * HR 系統 API 代理 - Cloudflare Worker
+ * 【v7・2026-07-13 時間軸資安改造版】
+ * 基於 2026-07-13 部署版，新增「時間軸整合載入」端點，讓時間軸網頁改為
+ * 「先驗密碼、再一次取回 事件＋備忘＋洽談」，網頁不再內含任何金鑰。
+ *
+ * 本版新增：
+ *   - CORS 允許標頭多加 X-TL-Pass
+ *   - memoAuth 除了 X-Memo-Key，也接受 X-TL-Pass === TIMELINE_PASSWORD（過渡期兩者都收）
+ *   - 新端點 POST /api/timeline/load {password} → {ok, events, memos, talks}
+ *   - 新函式 fetchTimelineEvents / fetchMemosRaw / fetchTalksRaw / handleTimelineLoad
+ *
+ * 需新增的環境變數（Settings → Variables）：
+ *   TIMELINE_PASSWORD  時間軸公司密碼（明文，只存在 Cloudflare，不在網頁）
+ *   DB_TIMELINE        Notion「時間軸事件」資料庫 ID
+ *
+ * 既有環境變數（沿用）：
+ *   HR_TOKEN / HR_ACCESS_KEY / HR_PASSWORD / ADMIN_PASSWORD / GEMINI_API_KEY
+ *   DB_LEAVE / DB_EXPENSE / DB_EMPLOYEES / DB_APPROVALS / DB_CHECKIN / DB_INTERVIEW
+ *   GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY / GOOGLE_DRIVE_FOLDER_ID
+ *   LINE_CHANNEL_TOKEN / LINE_GROUP_ID / CRM_TOKEN / DB_CRM
+ *   CRM_WORKER_URL / CRM_ACCESS_KEY / DB_MEMO / MEMO_KEY
+ *
+ * 上線穩定後的收尾（見部署指南）：確認新網頁正常後，移除 MEMO_KEY 環境變數，
+ * 並把 memoAuth 改為只認 TIMELINE_PASSWORD，即可徹底廢掉舊 smk 鑰匙。
+ */
+
+const ALLOWED_ORIGIN = 'https://seedmediatw-bot.github.io';
+
+function corsHeaders(origin) {
+  const allow = origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN;
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Access-Key, X-Memo-Key, X-TL-Pass',
+    'Access-Control-Max-Age': '86400',
+  };
 }
-</script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>種子娛樂進度時間軸</title>
-<style>
-  :root{
-    --ink:#1a1a1a;
-    --sub:#8a8a8a;
-    --line:#e2e2e2;
-    --accent:#2c2c2c;
-    --deyu:#4a7c59;
-    --dbs:#3b5b8c;
-    --seed:#a4682a;
-    --auto:#7a5aa0;
-    --warn:#b0752b;
-  }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{
-    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
-    color:var(--ink);
-    background:#fdfdfc;
-    line-height:1.75;
-    padding:72px 24px 96px;
-  }
-  .wrap{max-width:720px;margin:0 auto;}
 
-  header h1{font-size:1.6rem;font-weight:600;letter-spacing:.06em;}
-  header p{color:var(--sub);font-size:.85rem;margin-top:8px;letter-spacing:.04em;}
-  .updated{color:var(--sub);font-size:.78rem;margin-top:4px;}
-
-  /* 篩選 */
-  .filters{margin:40px 0 8px;display:flex;gap:8px;flex-wrap:wrap;}
-  .filters button{
-    border:1px solid var(--line);background:none;border-radius:999px;
-    padding:4px 14px;font-size:.78rem;color:var(--sub);cursor:pointer;
-    font-family:inherit;letter-spacing:.05em;transition:.15s;
-  }
-  .filters button.on{border-color:var(--ink);color:var(--ink);}
-
-  /* ===== 區塊（可收合、可拖曳） ===== */
-  section.block{margin-top:56px;}
-  .bhead{
-    display:flex;align-items:center;gap:10px;
-    padding-bottom:12px;border-bottom:1px solid var(--line);
-  }
-  .bhead h2{font-size:1.05rem;font-weight:600;letter-spacing:.08em;}
-  .bhead .sub-note{font-size:.72rem;color:var(--sub);font-weight:400;letter-spacing:.05em;}
-  .drag-handle{
-    cursor:grab;color:#555;font-size:.9rem;user-select:none;
-    line-height:1;padding:2px 2px 2px 0;
-  }
-  .drag-handle:active{cursor:grabbing;}
-  .toggle-btn{
-    margin-left:auto;flex-shrink:0;
-    border:1px solid #aaa;background:none;border-radius:4px;
-    width:22px;height:22px;font-size:.85rem;line-height:1;color:#444;
-    cursor:pointer;font-family:inherit;transition:.15s;
-  }
-  .toggle-btn:hover{border-color:var(--ink);color:var(--ink);}
-  section.block.collapsed .bbody{display:none;}
-  section.block.drag-over{border-top:2px solid var(--accent);}
-  section.block.dragging{opacity:.4;}
-
-  /* 閱讀方向指示 */
-  .direction{
-    margin-top:28px;display:flex;align-items:center;gap:12px;
-    padding-left:120px;color:var(--sub);
-  }
-  .direction svg{flex-shrink:0;}
-  .direction span{font-size:.75rem;letter-spacing:.12em;}
-
-  /* 時間軸 */
-  .timeline{margin-top:12px;position:relative;}
-  .timeline::before{
-    content:"";position:absolute;left:96px;top:0;bottom:0;width:1px;background:var(--line);
-  }
-  .entry{
-    display:flex;gap:32px;padding:12px 0;position:relative;
-  }
-  .entry .date{
-    width:64px;flex-shrink:0;text-align:right;
-    font-size:.82rem;color:var(--sub);font-variant-numeric:tabular-nums;
-    padding-top:16px;letter-spacing:.03em;
-  }
-  .entry .dot{
-    position:absolute;left:92.5px;top:36px;width:8px;height:8px;border-radius:50%;
-    background:#fdfdfc;border:1.5px solid var(--accent);
-  }
-  .entry.cat-deyu .dot{border-color:var(--deyu);}
-  .entry.cat-dbs  .dot{border-color:var(--dbs);}
-  .entry.cat-seed .dot{border-color:var(--seed);}
-  .entry .body{
-    margin-left:24px;flex:1;
-    padding:14px 18px;border-radius:8px;
-    background:#f6f6f4;
-  }
-  .entry.cat-deyu .body{background:#f0f6f2;}
-  .entry.cat-dbs  .body{background:#eff3f9;}
-  .entry.cat-seed .body{background:#f9f3ec;}
-  .entry .title{font-size:.95rem;font-weight:500;}
-  .entry .note{font-size:.85rem;color:#555;margin-top:4px;}
-  .entry .decided{font-size:.8rem;margin-top:6px;color:var(--deyu);}
-  .entry .decided::before{content:"✓ 已定案　";letter-spacing:.05em;}
-  .entry .pending{font-size:.8rem;margin-top:6px;color:var(--warn);}
-  .entry .pending::before{content:"… 待回覆　";letter-spacing:.05em;}
-
-  /* 時間軸終點（最新） */
-  .tl-end{
-    display:flex;align-items:center;gap:12px;padding:14px 0 0 120px;color:var(--sub);
-  }
-  .tl-end span{font-size:.72rem;letter-spacing:.12em;}
-
-  .tag{
-    display:inline-block;font-size:.68rem;letter-spacing:.08em;
-    padding:1px 8px;border-radius:3px;margin-left:10px;vertical-align:2px;
-  }
-  .tag.deyu{color:var(--deyu);background:#eef4f0;}
-  .tag.dbs{color:var(--dbs);background:#edf1f7;}
-  .tag.seed{color:var(--seed);background:#f7f1ea;}
-  .tag.auto{color:var(--auto);background:#f2eef7;}
-
-  /* 洽談中 */
-  .talk{
-    display:grid;grid-template-columns:190px 1fr;gap:0 20px;
-    padding:14px 18px;margin-top:14px;border-radius:8px;background:#f6f6f4;
-    align-items:start;cursor:pointer;position:relative;
-  }
-  .talk .name{font-size:.92rem;font-weight:500;line-height:1.6;padding-right:20px;}
-  .talk .status-chip{
-    display:inline-block;font-size:.68rem;letter-spacing:.08em;
-    padding:1px 8px;border-radius:3px;margin-top:6px;
-  }
-  .talk .now{font-size:.85rem;color:#555;}
-  .talk .now .meta{font-size:.75rem;color:var(--sub);margin-top:4px;letter-spacing:.03em;}
-  .talk .late{color:var(--warn);}
-  .st-quoted{color:#1A5276;background:#D6EAF8;}
-  .st-mou{color:#6C3483;background:#E8DAEF;}
-  .st-willing{color:#9A7D0A;background:#FDEBD0;}
-  .st-follow{color:#616A6B;background:#ECECEA;}
-  .st-signed{color:#1E8449;background:#D5F5E3;}
-
-  /* 客戶展開箭頭 */
-  .talk .chev{
-    position:absolute;top:16px;right:16px;color:#c0c0bc;font-size:.75rem;
-    transition:transform .15s;
-  }
-  .talk.open .chev{transform:rotate(90deg);}
-
-  /* 客戶展開內容：迷你時間軸 → 概況說明 */
-  .talk .detail{display:none;grid-column:1/-1;margin-top:12px;}
-  .talk.open .detail{display:block;}
-  .hist{border-left:1px solid #dcdcd8;padding-left:16px;margin-left:2px;}
-  .hist .h-item{font-size:.8rem;color:#555;padding:3px 0;}
-  .hist .h-date{color:var(--sub);font-variant-numeric:tabular-nums;margin-right:10px;letter-spacing:.03em;}
-  .overview{
-    margin-top:14px;padding:12px 16px;background:#fdfdfc;
-    border:1px solid var(--line);border-radius:6px;
-    font-size:.84rem;color:#444;
-  }
-  .overview .ov-label{
-    display:block;font-size:.7rem;letter-spacing:.14em;
-    color:var(--sub);margin-bottom:4px;
-  }
-
-  @media (max-width:560px){
-    .talk{grid-template-columns:1fr;gap:8px 0;}
-  }
-
-  /* 同事備忘 */
-  .memo-form{margin-top:16px;}
-  .memo-names{display:flex;gap:8px;flex-wrap:wrap;}
-  .memo-names button{
-    border:1px solid var(--line);background:none;border-radius:999px;
-    padding:3px 14px;font-size:.8rem;color:var(--sub);cursor:pointer;
-    font-family:inherit;letter-spacing:.05em;transition:.15s;
-  }
-  .memo-names button.on{border-color:var(--ink);color:var(--ink);}
-  .memo-form textarea{
-    width:100%;margin-top:10px;padding:10px 14px;
-    border:1px solid var(--line);border-radius:8px;background:#fff;
-    font-family:inherit;font-size:.85rem;color:var(--ink);line-height:1.7;
-    resize:vertical;outline:none;
-  }
-  .memo-form textarea:focus{border-color:#aaa;}
-  .memo-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:8px;}
-  .memo-status{font-size:.78rem;color:var(--sub);}
-  .memo-status.err{color:var(--warn);}
-  #memo-send{
-    border:1px solid #555;background:none;border-radius:6px;
-    padding:4px 18px;font-size:.82rem;color:#333;cursor:pointer;
-    font-family:inherit;letter-spacing:.08em;transition:.15s;
-  }
-  #memo-send:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
-  #memo-send:disabled{opacity:.4;cursor:default;}
-  .memo-item{
-    padding:10px 42px 10px 16px;margin-top:12px;border-radius:8px;
-    background:#f6f6f4;font-size:.85rem;color:#444;position:relative;
-  }
-  .memo-item .m-meta{font-size:.75rem;color:var(--sub);margin-right:10px;letter-spacing:.03em;}
-  .memo-del{
-    position:absolute;right:10px;top:8px;
-    border:none;background:none;color:#c0c0bc;font-size:.85rem;
-    cursor:pointer;font-family:inherit;padding:2px 6px;transition:.15s;
-  }
-  .memo-del:hover{color:var(--warn);}
-
-  /* 個人自動化工程 */
-  .auto-item{
-    padding:14px 18px;margin-top:14px;border-radius:8px;
-    background:#f4f0f8;
-  }
-  .auto-item .t{font-size:.92rem;font-weight:500;}
-  .auto-item .d{font-size:.84rem;color:#555;margin-top:4px;}
-
-  /* 已結案／暫緩 */
-  .closed-item{
-    padding:14px 18px;margin-top:14px;border-radius:8px;
-    background:#f6f6f4;
-  }
-  .closed-item .t{font-size:.92rem;font-weight:500;color:#666;}
-  .closed-item .d{font-size:.84rem;color:#777;margin-top:4px;}
-  .empty-hint{margin-top:14px;font-size:.8rem;color:var(--sub);letter-spacing:.05em;}
-
-  footer{margin-top:80px;color:var(--sub);font-size:.75rem;text-align:center;letter-spacing:.05em;}
-
-  @media (max-width:560px){
-    .timeline::before{left:70px;}
-    .entry{gap:20px;}
-    .entry .date{width:48px;font-size:.75rem;}
-    .entry .dot{left:66.5px;}
-    .entry .body{margin-left:16px;padding:12px 14px;}
-    .direction,.tl-end{padding-left:88px;}
-  }
-  body.locked .wrap{display:none;}
-</style>
-</head>
-<body class="locked">
-<div class="wrap">
-
-  <header>
-    <h1>種子娛樂進度時間軸</h1>
-    <p>全員共同維護・Sam 主視角建置｜掌握每天在做什麼・CRM 何時變化・哪些已明確講好</p>
-    <p class="updated" id="updated"></p>
-  </header>
-
-  <div class="filters" id="filters">
-    <button data-cat="all" class="on">全部</button>
-    <button data-cat="deyu">德育</button>
-    <button data-cat="dbs">星展 DBS</button>
-    <button data-cat="seed">種子內部</button>
-    <button data-cat="talks">洽談中</button>
-  </div>
-
-  <!-- ===== 可收合、可拖曳的區塊容器 ===== -->
-  <div id="blocks">
-
-    <section class="block" data-key="tl" id="tl-block">
-      <div class="bhead">
-        <span class="drag-handle" title="拖曳調整順序">⠿</span>
-        <h2>進度時間軸</h2>
-        <button class="toggle-btn" title="收合／展開">−</button>
-      </div>
-      <div class="bbody">
-        <div class="direction" aria-hidden="true">
-          <svg width="22" height="30" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="11" cy="6" r="4.5" stroke="#8a8a8a" stroke-width="1.4"/>
-            <line x1="11" y1="12" x2="11" y2="24" stroke="#8a8a8a" stroke-width="1.4"/>
-            <path d="M6.5 20.5 L11 25.5 L15.5 20.5" stroke="#8a8a8a" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>時間由上而下・往下即最新</span>
-        </div>
-        <div class="timeline" id="timeline"></div>
-        <div class="tl-end" aria-hidden="true">
-          <svg width="22" height="14" viewBox="0 0 22 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="11" cy="7" r="5" fill="#2c2c2c"/>
-          </svg>
-          <span id="tl-end-label">目前進度</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="block" data-key="talks" id="talks-block">
-      <div class="bhead">
-        <span class="drag-handle" title="拖曳調整順序">⠿</span>
-        <h2>洽談中 <span class="sub-note">點客戶可展開概況｜開頁即時同步自 Notion CRM</span></h2>
-        <button class="toggle-btn" title="收合／展開">−</button>
-      </div>
-      <div class="bbody"><div id="talks"></div></div>
-    </section>
-
-    <section class="block" data-key="memo" id="memo-block">
-      <div class="bhead">
-        <span class="drag-handle" title="拖曳調整順序">⠿</span>
-        <h2>同事備忘 <span class="sub-note">選名字、打字、送出——Sam 整理後移入正式時間軸</span></h2>
-        <button class="toggle-btn" title="收合／展開">−</button>
-      </div>
-      <div class="bbody">
-        <div class="memo-form">
-          <div class="memo-names" id="memo-names">
-            <button data-n="文娟">文娟</button>
-            <button data-n="志成">志成</button>
-            <button data-n="Sam">Sam</button>
-            <button data-n="俊宏">俊宏</button>
-          </div>
-          <textarea id="memo-input" rows="2" placeholder="想補充的進度、提醒、客戶消息……寫完按送出"></textarea>
-          <div class="memo-actions">
-            <span class="memo-status" id="memo-status"></span>
-            <button id="memo-send">送出</button>
-          </div>
-        </div>
-        <div id="memo-items"></div>
-      </div>
-    </section>
-
-    <section class="block" data-key="closed" id="closed-block">
-      <div class="bhead">
-        <span class="drag-handle" title="拖曳調整順序">⠿</span>
-        <h2>已結案／暫緩 <span class="sub-note">前因後果封存區</span></h2>
-        <button class="toggle-btn" title="收合／展開">−</button>
-      </div>
-      <div class="bbody" id="closed-items"></div>
-    </section>
-
-  </div>
-
-  <footer>種子娛樂・全員共同維護｜此檔案可持續更新</footer>
-</div>
-
-<script>
-/* ============================================================
-   密碼閘門：輸入公司共用密碼才顯示內容（每台裝置記住一次）
-   要改密碼：請 Claude 重算下面的 GATE_HASH
-   ============================================================ */
-const GATE_HASH = "23b05eb9e1f2fe970876f00456e1de5607252b55efe28a4b73b2a4483363b789";
-async function sha256Hex(s){
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
+function okResponse(data, origin, status = 200) {
+  return Response.json(data, { status, headers: corsHeaders(origin) });
 }
-(async function gate(){
-  try{
-    if(localStorage.getItem("seedtl.gate") === GATE_HASH){
-      document.body.classList.remove("locked");
-      return;
-    }
-    for(let i = 0; i < 3; i++){
-      const pw = prompt("種子娛樂進度時間軸\n請輸入公司密碼");
-      if(pw === null) break;
-      if(await sha256Hex(pw.trim()) === GATE_HASH){
-        localStorage.setItem("seedtl.gate", GATE_HASH);
-        document.body.classList.remove("locked");
-        return;
+
+function errResponse(message, origin, status = 400) {
+  return Response.json({ status: 'error', message }, { status, headers: corsHeaders(origin) });
+}
+
+function authCheck(request, expectedKey) {
+  if (!expectedKey) return false;
+  return request.headers.get('X-Access-Key') === expectedKey;
+}
+
+// ── LINE 推播 ─────────────────────────────────────────────────
+
+async function sendLine(token, groupId, message) {
+  if (!token || !groupId) return;
+  await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: groupId, messages: [{ type: 'text', text: message }] }),
+  });
+}
+
+async function replyLine(token, replyToken, message) {
+  if (!token || !replyToken) return;
+  await fetch('https://api.line.me/v2/bot/message/reply', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ replyToken, messages: [{ type: 'text', text: message }] }),
+  });
+}
+
+async function searchCandidateByName(name, env) {
+  if (!env.DB_INTERVIEW || !env.HR_TOKEN) return null;
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_INTERVIEW}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filter: { property: '姓名', title: { contains: name } } }),
+  });
+  const data = await res.json();
+  return data.results && data.results[0] ? data.results[0] : null;
+}
+
+async function handleLineWebhook(request, env) {
+  try {
+    const body = await request.json();
+    const events = body.events || [];
+    const ratingMap = { 'A': 'A — 馬上可用', 'B': 'B — 考慮中', 'C': 'C — 不考慮' };
+    for (const event of events) {
+      if (event.type !== 'message' || event.message.type !== 'text') continue;
+      const text = event.message.text.trim();
+      const replyToken = event.replyToken;
+      const mentionees = event.message.mention?.mentionees || [];
+      const botMentioned = mentionees.some(m => m.isSelf === true);
+      if (!botMentioned) continue;
+      const cleanText = text.replace(/@\S+/g, '').trim();
+
+      const ratingMatch = cleanText.match(/評分\s+(.+?)\s+([ABCabc])$/);
+      if (ratingMatch) {
+        const name = ratingMatch[1].trim();
+        const rating = ratingMap[ratingMatch[2].toUpperCase()];
+        if (!rating) { await replyLine(env.LINE_CHANNEL_TOKEN, replyToken, '❌ 評級請輸入 A、B 或 C'); continue; }
+        const candidate = await searchCandidateByName(name, env);
+        if (!candidate) { await replyLine(env.LINE_CHANNEL_TOKEN, replyToken, `❌ 找不到候選人：${name}`); continue; }
+        await fetch(`https://api.notion.com/v1/pages/${candidate.id}`, {
+          method: 'PATCH',
+          headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ properties: { '評級': { select: { name: rating } } } }),
+        });
+        await replyLine(env.LINE_CHANNEL_TOKEN, replyToken, `✅ 已更新評分\n${name}：${rating}\n已同步至 Notion`);
+        continue;
       }
+
+      if (cleanText === '今日請假') {
+        const msg = await queryTodayLeave(env);
+        await replyLine(env.LINE_CHANNEL_TOKEN, replyToken, msg);
+        continue;
+      }
+      const leaveQueryMatch = cleanText.match(/^請假查詢\s+(.+)$/);
+      if (leaveQueryMatch) {
+        const msg = await queryLeaveByName(leaveQueryMatch[1].trim(), env);
+        await replyLine(env.LINE_CHANNEL_TOKEN, replyToken, msg);
+        continue;
+      }
+
+      const crmCommands = ['客戶總覽', '跟進提醒'];
+      const clientMatch = cleanText.match(/^客戶\s+(.+)$/);
+      if (crmCommands.includes(cleanText) || clientMatch) {
+        const args = clientMatch ? clientMatch[1].trim() : '';
+        const command = clientMatch ? '客戶' : cleanText;
+        const msg = await forwardToCRM(command, args, env);
+        await replyLine(env.LINE_CHANNEL_TOKEN, replyToken, msg);
+        continue;
+      }
+
+      await replyLine(env.LINE_CHANNEL_TOKEN, replyToken,
+        '📋 可用指令：\n' +
+        '【HR】\n・評分 姓名 A/B/C\n・今日請假\n・請假查詢 姓名\n' +
+        '【CRM】\n・客戶總覽\n・客戶 客戶名稱\n・跟進提醒'
+      );
     }
-    document.querySelector(".wrap").remove();
-    document.body.classList.remove("locked");
-    document.body.innerHTML = '<p style="text-align:center;margin-top:40vh;color:#8a8a8a;font-size:.9rem;">需要密碼才能檢視——請重新整理再試</p>';
-  }catch(e){
-    // 極舊瀏覽器不支援加密 API 時直接顯示（不擋自己人）
-    document.body.classList.remove("locked");
+  } catch (e) {
+    console.log('[LINE webhook error]', e.message);
   }
-})();
-
-/* ============================================================
-   共同維護規則：只改下方「資料區」，不要動後面的程式區。
-   年份設定（跨年時改這裡）
-   ============================================================ */
-const YEAR = 2026;
-
-/* ============================================================
-   同事備忘：直接在網頁上輸入送出，資料存 Notion「🕰️ 時間軸備忘」
-   Sam 整理後在 Notion 把該筆狀態改「已整理」，即從頁面消失
-   ============================================================ */
-const MEMO_API = "https://hr-system123.seedmediatw.workers.dev";
-const TALKS_API = "https://crm-system456.seedmediatw.workers.dev";
-const MEMO_KEY = "smk_d647fc5cda8f21dbd953c780";
-
-/* ============================================================
-   進度時間軸：在 ENTRIES 加一筆物件即可（位置不拘，自動依日期由舊到新排序）
-   { date:"07-09", cat:"dbs", title:"標題", note:"補充說明（可省略）",
-     decided:"已明確講好的事（可省略）", pending:"還在等的事（可省略）" }
-   cat 可選：deyu（德育）/ dbs（星展）/ seed（種子內部）
-   要加新分類：在 :root 加色票、.tag 加樣式、filters 加按鈕、CATNAME 加名稱
-   ============================================================ */
-const ENTRIES = [
-  { date:"07-11", cat:"seed",
-    title:"官網 AI Workshop 正式上線",
-    note:"資料夾版整合完成後部署至正式站，逐段驗收通過。同日經 GEO 更新後，最終線上版本標記為 v2026-07-11-geo-meta3。" },
-  { date:"07-11", cat:"seed",
-    title:"官網 GEO 地基完成",
-    note:"清除佔用網址的舊「AI變現研究院」頁面，搜尋與社群標籤上線（v2026-07-11-geo-meta3），FB 分享卡驗證通過。" },
-  { date:"07-11", cat:"seed",
-    title:"Google Search Console 開通",
-    note:"sitemap 已提交、工作坊頁已申請優先收錄。" },
-  { date:"07-09", cat:"dbs",
-    title:"星展 Sheeny 電話定調本週三優先",
-    note:"①最急｜7–12月場次表（每月兩場含對象、時間，先確定7、8月，風險場次要標註）②報價單 Excel 兩分頁（現有定價表＋下半年報價，含影片微調／直播／客訴影片，轉 STARCOM 付款）③AI 條款 General Order 第九項不可刪。重大轉折：費用改走 STARCOM，「成為供應商」路線先 drop、下週再評估風險。",
-    decided:"已回覆 Muke 澄清信（MOOC 與星展無關）＋上傳初稿 5 Word＋5 PDF 到 DBS 內部雲端",
-    pending:"本週交出 7–12 月場次表；影片「改 vs 重做」評估時間差後回覆 Sheeny" },
-  { date:"07-08", cat:"seed",
-    title:"文娟姐指出接下來努力方向：內部手冊＋知識圖譜",
-    note:"內部手冊——已自行建立新人手冊並分享給同事一份。知識圖譜——參考中華日報的一張圖譜，但目標做得更簡潔。檔案先以上傳雲端保存為主。",
-    decided:"方向確立：內部手冊、知識圖譜，雲端保存" },
-  { date:"07-08", cat:"dbs",
-    title:"供應商文件初版繳交",
-    note:"上午透過 LINE 繳交 10 份文件（5 Word＋5 PDF）給 Sheeny。",
-    pending:"等星展方通知需補件或修改之處" },
-  { date:"07-06", cat:"dbs",
-    title:"與星展窗口 Sheeny 核對供應商文件細節",
-    note:"下午進行，確認文件格式與內容要求。" },
-  { date:"07-03", cat:"deyu",
-    title:"康養旅遊計畫書推遲",
-    decided:"德育決定計畫書延至 11 月繳交" },
-  { date:"07-01", cat:"deyu",
-    title:"拍攝德育校長、副校長 AI 虛擬分身（HeyGen）",
-    note:"於課程期間完成拍攝與建立。" },
-  { date:"06-29", cat:"deyu",
-    title:"德育 AI 課程（06/29・07/01・07/02 三場完成）",
-    note:"三天課程全數上完。" },
-];
-
-const CATNAME = { deyu:"德育", dbs:"星展 DBS", seed:"種子內部" };
-
-/* ============================================================
-   洽談中／已暫緩：開頁自動從 Notion CRM 即時讀取，不需在此維護。
-   更新客戶進度＝更新 Notion CRM（截圖＋一句話給 Claude 即可），
-   網頁重新整理就是最新。
-   ============================================================ */
-
-/* ================= 以下為程式區，維護資料不需修改 ================= */
-
-const LATE_DAYS = 7; // 超過幾天未聯繫顯示提醒
-
-function daysSince(mmdd){
-  const m = /^(\d{2})-(\d{2})$/.exec(mmdd);
-  if(!m) return null;
-  const then = new Date(YEAR, +m[1]-1, +m[2]);
-  return Math.floor((Date.now() - then.getTime()) / 86400000);
+  return new Response('OK', { status: 200 });
 }
 
-/* 最後更新：取時間軸最新一筆日期，自動顯示 */
-(function(){
-  const latest = ENTRIES.map(e=>e.date).sort().pop() || "";
-  document.getElementById("updated").textContent = "最後更新：" + YEAR + "-" + latest;
-  document.getElementById("tl-end-label").textContent = "目前進度（" + YEAR + "-" + latest + "）";
-})();
+// ── CRM 轉發 ─────────────────────────────────────────────────
 
-/* 同事備忘：讀取與送出 */
-const memoStatus = (msg, isErr) => {
-  const el = document.getElementById("memo-status");
-  el.textContent = msg || "";
-  el.classList.toggle("err", !!isErr);
-};
-
-function escapeHtml(s){
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-async function loadMemos(){
-  const box = document.getElementById("memo-items");
-  try{
-    const res = await fetch(MEMO_API + "/api/memos", { headers: { "X-Memo-Key": MEMO_KEY } });
-    if(!res.ok) throw new Error(res.status);
-    const { memos } = await res.json();
-    box.innerHTML = memos.length
-      ? memos.map(m => `<div class="memo-item"><span class="m-meta">${(m.date||"").slice(5)}｜${escapeHtml(m.name)}</span>${escapeHtml(m.content)}<button class="memo-del" data-id="${m.id}" title="刪除這則備忘">✕</button></div>`).join("")
-      : `<div class="empty-hint">目前沒有新備忘</div>`;
-  }catch(e){
-    box.innerHTML = `<div class="empty-hint">備忘讀取失敗——請從公司網址開啟本頁（本機檔案無法連線）</div>`;
-  }
-}
-loadMemos();
-
-/* 備忘刪除：網頁移除＋Notion 同步封存（可從 Notion 垃圾桶救回） */
-document.getElementById("memo-items").addEventListener("click", async ev=>{
-  const btn = ev.target.closest(".memo-del");
-  if(!btn) return;
-  if(!confirm("確定刪除這則備忘？（Notion 端會一併移除）")) return;
-  btn.disabled = true;
-  try{
-    const res = await fetch(MEMO_API + "/api/memo/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Memo-Key": MEMO_KEY },
-      body: JSON.stringify({ id: btn.dataset.id }),
+async function forwardToCRM(command, args, env) {
+  if (!env.CRM_WORKER_URL || !env.CRM_ACCESS_KEY) return '❌ CRM Worker 未設定，請聯絡管理員';
+  try {
+    const res = await fetch(`${env.CRM_WORKER_URL}/api/crm/line-query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Key': env.CRM_ACCESS_KEY },
+      body: JSON.stringify({ command, args }),
     });
-    if(!res.ok) throw new Error(res.status);
-    loadMemos();
-  }catch(e){
-    btn.disabled = false;
-    alert("刪除失敗，請稍後再試");
+    const data = await res.json();
+    return data.message || '❌ CRM 回應錯誤';
+  } catch (e) {
+    return '❌ 無法連線至 CRM：' + e.message;
   }
-});
+}
 
-/* 名字選擇（記住上次選誰） */
-(function(){
-  const saved = localStorage.getItem("seedtl.memoName") || "";
-  document.querySelectorAll("#memo-names button").forEach(b=>{
-    if(b.dataset.n === saved) b.classList.add("on");
-    b.addEventListener("click", ()=>{
-      document.querySelectorAll("#memo-names button").forEach(x=>x.classList.remove("on"));
-      b.classList.add("on");
-      localStorage.setItem("seedtl.memoName", b.dataset.n);
-    });
+// ── LINE 通知端點 ─────────────────────────────────────────────
+
+async function handleLineNotify(request, env, origin) {
+  if (!authCheck(request, env.HR_ACCESS_KEY)) {
+    return errResponse('Unauthorized Access', origin, 401);
+  }
+  try {
+    const { message } = await request.json();
+    if (!message) return errResponse('message required', origin, 400);
+    await sendLine(env.LINE_CHANNEL_TOKEN, env.LINE_GROUP_ID, message);
+    return okResponse({ ok: true }, origin);
+  } catch (e) {
+    return errResponse('LINE notify error: ' + e.message, origin, 500);
+  }
+}
+
+// ── Notion 代理 ───────────────────────────────────────────────
+
+async function notionProxy(request, token, notionPath, origin) {
+  if (!token) return errResponse('Notion token not configured', origin, 500);
+  const res = await fetch('https://api.notion.com/v1/' + notionPath, {
+    method: request.method,
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: request.method !== 'GET' ? request.body : undefined,
   });
-})();
-
-document.getElementById("memo-send").addEventListener("click", async ()=>{
-  const input = document.getElementById("memo-input");
-  const name = document.querySelector("#memo-names button.on")?.dataset.n;
-  const content = input.value.trim();
-  if(!name){ memoStatus("請先選你的名字", true); return; }
-  if(!content){ memoStatus("內容是空的", true); return; }
-  const btn = document.getElementById("memo-send");
-  btn.disabled = true; memoStatus("送出中…");
-  try{
-    const res = await fetch(MEMO_API + "/api/memo", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Memo-Key": MEMO_KEY },
-      body: JSON.stringify({ content, name }),
-    });
-    if(!res.ok) throw new Error(res.status);
-    input.value = "";
-    memoStatus("已送出 ✓");
-    setTimeout(()=>memoStatus(""), 3000);
-    loadMemos();
-  }catch(e){
-    memoStatus("送出失敗，請稍後再試", true);
-  }finally{
-    btn.disabled = false;
-  }
-});
-
-/* 洽談中＋已暫緩：即時從 Notion CRM 讀取 */
-const ST_CLASS = {
-  "已簽約":"st-signed", "MOU 待簽":"st-mou", "有意願待簽約":"st-willing",
-  "已報價":"st-quoted", "報價中":"st-quoted", "製作中":"st-willing",
-  "跟進中":"st-follow", "戰略夥伴":"st-follow",
-};
-const fmtMD = iso => iso ? iso.slice(5) : "—";
-function daysSinceISO(iso){
-  if(!iso) return null;
-  const t = new Date(iso + "T00:00:00");
-  if(isNaN(t)) return null;
-  return Math.floor((Date.now() - t.getTime()) / 86400000);
-}
-
-async function loadTalks(){
-  const box = document.getElementById("talks");
-  const closedBox = document.getElementById("closed-items");
-  try{
-    const res = await fetch(TALKS_API + "/api/crm/talks", { headers: { "X-Memo-Key": MEMO_KEY } });
-    if(!res.ok) throw new Error(res.status);
-    const { talks } = await res.json();
-    // 排序：比照時間軸，依最近聯繫日期由舊到近（上→下）
-    const byDate = (a,b) => (a.last||"").localeCompare(b.last||"");
-    // 結案／暫停／暫緩／已簽約 不算洽談中
-    const CLOSED_ST = ["結案","結束","暫停","暫緩","已簽約"];
-    const named = talks.filter(t => t.name);
-    const active = named.filter(t => !CLOSED_ST.includes(t.status)).sort(byDate);
-    const closed = named.filter(t => ["結案","結束","暫停","暫緩"].includes(t.status)).sort(byDate);
-    box.innerHTML = active.length ? active.map(t => {
-      const d = daysSinceISO(t.last);
-      const late = (d !== null && d > LATE_DAYS) ? `<span class="late">・逾 ${d} 天</span>` : "";
-      return `
-      <div class="talk">
-        <div class="name">${escapeHtml(t.name)}<br><span class="status-chip ${ST_CLASS[t.status]||"st-follow"}">${escapeHtml(t.status||"—")}</span></div>
-        <div class="now">${escapeHtml(t.action||"（尚未填下一步行動）")}<div class="meta">最近聯繫：${fmtMD(t.last)}${late}${t.next ? "　下次跟進：" + fmtMD(t.next) : ""}</div></div>
-        <span class="chev">▶</span>
-        <div class="detail">
-          <div class="overview"><span class="ov-label">概 況 說 明</span>${escapeHtml(t.note||"（待補）")}</div>
-          ${t.promise ? `<div class="overview"><span class="ov-label">承 諾 事 項</span>${escapeHtml(t.promise)}</div>` : ""}
-        </div>
-      </div>`;
-    }).join("") : `<div class="empty-hint">CRM 目前沒有洽談中客戶</div>`;
-    closedBox.innerHTML = closed.length
-      ? closed.map(t=>`<div class="closed-item"><div class="t">${escapeHtml(t.name)}｜${escapeHtml(t.status)}</div><div class="d">${escapeHtml(t.note||t.action||"")}</div></div>`).join("")
-      : `<div class="empty-hint">尚無結案／暫緩紀錄</div>`;
-  }catch(e){
-    box.innerHTML = `<div class="empty-hint">客戶資料讀取失敗——請從公司網址開啟本頁</div>`;
-    closedBox.innerHTML = `<div class="empty-hint">—</div>`;
-  }
-}
-loadTalks();
-document.getElementById("talks").addEventListener("click", ev=>{
-  const card = ev.target.closest(".talk");
-  if(card) card.classList.toggle("open");
-});
-
-/* 時間軸 */
-function render(filter){
-  const tl = document.getElementById("timeline");
-  tl.innerHTML = ENTRIES
-    .filter(e => filter === "all" || e.cat === filter)
-    .sort((a,b) => a.date.localeCompare(b.date))
-    .map(e => `
-      <div class="entry cat-${e.cat}">
-        <div class="date">${e.date}</div>
-        <div class="dot"></div>
-        <div class="body">
-          <div class="title">${e.title}<span class="tag ${e.cat}">${CATNAME[e.cat]||e.cat}</span></div>
-          ${e.note ? `<div class="note">${e.note}</div>` : ""}
-          ${e.decided ? `<div class="decided">${e.decided}</div>` : ""}
-          ${e.pending ? `<div class="pending">${e.pending}</div>` : ""}
-        </div>
-      </div>`).join("");
-}
-
-/* 篩選：
-   全部＝所有區塊
-   洽談中＝只顯示洽談中
-   德育/星展/種子內部＝只顯示時間軸（內容依分類過濾）
-   每個頁面的收合狀態互相獨立 */
-let currentCat = "all";
-const VISIBLE = {
-  all:   ["tl","talks","memo","closed"],
-  talks: ["talks"],
-};
-function applyFilter(cat){
-  currentCat = cat;
-  const visible = VISIBLE[cat] || ["tl"];
-  document.querySelectorAll("#blocks > section.block").forEach(sec=>{
-    sec.style.display = visible.includes(sec.dataset.key) ? "" : "none";
-  });
-  if(cat !== "talks") render(cat);
-  applyCollapseState();
-}
-
-document.getElementById("filters").addEventListener("click", ev=>{
-  const b = ev.target.closest("button"); if(!b) return;
-  document.querySelectorAll("#filters button").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on");
-  applyFilter(b.dataset.cat);
-});
-
-/* ===== 區塊收合（每個篩選頁面狀態獨立記憶）===== */
-const LS_COLLAPSE = "seedtl.collapsed.v2"; // { 頁面: { 區塊key: 是否收合 } }
-function loadCollapsed(){
-  try{ return JSON.parse(localStorage.getItem(LS_COLLAPSE)) || {}; }catch(e){ return {}; }
-}
-let collapseState = loadCollapsed();
-function pageState(){
-  if(!collapseState[currentCat]) collapseState[currentCat] = { closed:true }; // 預設：已結案／暫緩收合
-  return collapseState[currentCat];
-}
-function applyCollapseState(){
-  const st = pageState();
-  document.querySelectorAll("#blocks > section.block").forEach(sec=>{
-    sec.classList.toggle("collapsed", !!st[sec.dataset.key]);
-    sec.querySelector(".toggle-btn").textContent = st[sec.dataset.key] ? "＋" : "−";
+  const data = await res.text();
+  return new Response(data, {
+    status: res.status,
+    headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
   });
 }
-(function initCollapse(){
-  document.querySelectorAll("#blocks > section.block").forEach(sec=>{
-    sec.querySelector(".toggle-btn").addEventListener("click", ()=>{
-      const st = pageState();
-      st[sec.dataset.key] = !st[sec.dataset.key];
-      try{ localStorage.setItem(LS_COLLAPSE, JSON.stringify(collapseState)); }catch(e){}
-      applyCollapseState();
+
+// ── HR 模組 ───────────────────────────────────────────────────
+
+async function handleHR(request, env, pathname, origin) {
+  if (!authCheck(request, env.HR_ACCESS_KEY)) {
+    return errResponse('Unauthorized Access', origin, 401);
+  }
+  if (pathname === '/api/hr/drive-upload') return handleDriveUpload(request, env, origin);
+  if (pathname === '/api/hr/line/notify')   return handleLineNotify(request, env, origin);
+  const notionPath = pathname.replace('/api/hr/', '');
+  return notionProxy(request, env.HR_TOKEN, notionPath, origin);
+}
+
+// ── Gemini 模組 ───────────────────────────────────────────────
+
+async function handleGemini(request, env, origin) {
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) return errResponse('Gemini API key not configured', origin, 500);
+  try {
+    const body = await request.json();
+    const model = body.model || 'gemini-2.5-flash';
+    delete body.model;
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    const data = await res.text();
+    return new Response(data, {
+      status: res.status,
+      headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
     });
-  });
-})();
+  } catch (e) {
+    return errResponse('Gemini error: ' + e.message, origin, 500);
+  }
+}
 
-/* ===== 區塊拖曳排序（順序記憶）===== */
-const LS_ORDER = "seedtl.order";
-(function initDrag(){
-  const container = document.getElementById("blocks");
+// ── Google Drive 上傳 ─────────────────────────────────────────
 
-  // 還原上次順序
-  try{
-    const order = JSON.parse(localStorage.getItem(LS_ORDER));
-    if(Array.isArray(order)){
-      order.forEach(key=>{
-        const sec = container.querySelector(`section[data-key="${key}"]`);
-        if(sec) container.appendChild(sec);
-      });
+async function handleDriveUpload(request, env, origin) {
+  try {
+    const clientEmail = env.GOOGLE_CLIENT_EMAIL;
+    const privateKey = env.GOOGLE_PRIVATE_KEY;
+    const folderId = env.GOOGLE_DRIVE_FOLDER_ID;
+    if (!clientEmail || !privateKey || !folderId) {
+      return errResponse('Google Drive 環境變數未設定', origin, 500);
     }
-  }catch(e){}
+    const { base64, mimeType, filename } = await request.json();
+    const now = Math.floor(Date.now() / 1000);
+    const jwtHeader = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const jwtPayload = btoa(JSON.stringify({
+      iss: clientEmail, scope: 'https://www.googleapis.com/auth/drive.file',
+      aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
+    })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const signingInput = `${jwtHeader}.${jwtPayload}`;
+    const pemKey = privateKey.replace(/\\n/g,'\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/g,'').replace(/\s/g,'');
+    const keyBuffer = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
+    const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBuffer, { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
+    const sigBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput));
+    const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuffer))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const jwt = `${signingInput}.${sig}`;
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) return errResponse('Google 認證失敗', origin, 500);
+    const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const meta = JSON.stringify({ name: filename || 'receipt.jpg', parents: [folderId] });
+    const boundary = 'drive_boundary_hr';
+    const enc = new TextEncoder();
+    const p1 = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`);
+    const p2h = enc.encode(`--${boundary}\r\nContent-Type: ${mimeType || 'image/jpeg'}\r\n\r\n`);
+    const p2e = enc.encode(`\r\n--${boundary}--`);
+    const body = new Uint8Array(p1.length + p2h.length + binary.length + p2e.length);
+    let off = 0;
+    body.set(p1, off); off += p1.length;
+    body.set(p2h, off); off += p2h.length;
+    body.set(binary, off); off += binary.length;
+    body.set(p2e, off);
+    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body
+    });
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      return errResponse('Drive 上傳失敗: ' + errText.slice(0, 100), origin, 500);
+    }
+    const fileData = await uploadRes.json();
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+    return okResponse({ url: `https://drive.google.com/uc?export=view&id=${fileData.id}`, id: fileData.id }, origin);
+  } catch (e) {
+    return errResponse('Drive 上傳錯誤: ' + e.message, origin, 500);
+  }
+}
 
-  let dragging = null;
+// ── 身份驗證 ──────────────────────────────────────────────────
 
-  container.querySelectorAll("section.block").forEach(sec=>{
-    const handle = sec.querySelector(".drag-handle");
-    handle.addEventListener("mousedown", ()=> sec.setAttribute("draggable","true"));
-    handle.addEventListener("touchstart", ()=> sec.setAttribute("draggable","true"), {passive:true});
-    sec.addEventListener("dragstart", ev=>{
-      dragging = sec;
-      sec.classList.add("dragging");
-      ev.dataTransfer.effectAllowed = "move";
-    });
-    sec.addEventListener("dragend", ()=>{
-      sec.classList.remove("dragging");
-      sec.removeAttribute("draggable");
-      container.querySelectorAll(".drag-over").forEach(x=>x.classList.remove("drag-over"));
-      dragging = null;
-      const order = [...container.querySelectorAll("section.block")].map(s=>s.dataset.key);
-      try{ localStorage.setItem(LS_ORDER, JSON.stringify(order)); }catch(e){}
-    });
-    sec.addEventListener("dragover", ev=>{
-      ev.preventDefault();
-      if(!dragging || dragging === sec) return;
-      container.querySelectorAll(".drag-over").forEach(x=>x.classList.remove("drag-over"));
-      sec.classList.add("drag-over");
-    });
-    sec.addEventListener("drop", ev=>{
-      ev.preventDefault();
-      if(!dragging || dragging === sec) return;
-      const rect = sec.getBoundingClientRect();
-      const before = ev.clientY < rect.top + rect.height/2;
-      container.insertBefore(dragging, before ? sec : sec.nextSibling);
-      sec.classList.remove("drag-over");
-    });
+async function handleAuth(request, env, origin) {
+  try {
+    const { system, password } = await request.json();
+    const pwMap = { hr: env.HR_PASSWORD, admin: env.ADMIN_PASSWORD };
+    const expected = pwMap[system];
+    if (!expected) return errResponse('Password not configured', origin, 500);
+    if (password === expected) {
+      const dbIds = system === 'hr' ? {
+        leave: env.DB_LEAVE, expense: env.DB_EXPENSE,
+        employees: env.DB_EMPLOYEES, approvals: env.DB_APPROVALS,
+        checkin: env.DB_CHECKIN, interview: env.DB_INTERVIEW,
+        accounts: env.DB_ACCOUNTS,
+      } : {};
+      return okResponse({ ok: true, accessKey: system === 'hr' ? env.HR_ACCESS_KEY : null, dbIds }, origin);
+    }
+    return errResponse('密碼錯誤', origin, 401);
+  } catch (e) {
+    return errResponse('Invalid request', origin, 400);
+  }
+}
+
+// ── HR 請假查詢 ───────────────────────────────────────────────
+
+async function queryTodayLeave(env) {
+  if (!env.HR_TOKEN || !env.DB_LEAVE) return '❌ 請假資料庫未設定';
+  const pad = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_LEAVE}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filter: { and: [
+        { property: '開始日期', date: { on_or_before: today } },
+        { property: '結束日期', date: { on_or_after: today } },
+      ]},
+      sorts: [{ property: '開始日期', direction: 'ascending' }],
+    }),
   });
-})();
+  const data = await res.json();
+  const records = data.results || [];
+  if (records.length === 0) return `📅 今日請假（${today}）\n\n今日無人請假 ✓`;
+  const lines = records.map(r => {
+    const pr = r.properties;
+    const name = pr['姓名']?.rich_text?.[0]?.plain_text || '未知';
+    const type = pr['假別']?.select?.name || '';
+    const days = pr['請假天數']?.number || '';
+    return `• ${name}　${type}${days ? '　' + days + '天' : ''}`;
+  });
+  return `📅 今日請假（${today}）\n\n${lines.join('\n')}\n\n共 ${records.length} 人`;
+}
 
-applyFilter("all");
-</script>
-</body>
-</html>
+async function queryLeaveByName(name, env) {
+  if (!env.HR_TOKEN || !env.DB_LEAVE) return '❌ 請假資料庫未設定';
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_LEAVE}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filter: { property: '姓名', rich_text: { contains: name } },
+      sorts: [{ property: '開始日期', direction: 'descending' }],
+      page_size: 5,
+    }),
+  });
+  const data = await res.json();
+  const records = data.results || [];
+  if (records.length === 0) return `❌ 找不到 ${name} 的請假記錄`;
+  const lines = records.map(r => {
+    const pr = r.properties;
+    const type = pr['假別']?.select?.name || '';
+    const start = pr['開始日期']?.date?.start || '';
+    const end = pr['結束日期']?.date?.start || '';
+    const days = pr['請假天數']?.number || '';
+    const status = pr['審核狀態']?.select?.name || '';
+    return `• ${start}${end && end !== start ? ' ～ ' + end : ''}　${type}${days ? ' ' + days + '天' : ''}　${status}`;
+  });
+  return `📋 ${name} 的請假記錄（最近 ${records.length} 筆）\n\n${lines.join('\n')}`;
+}
+
+// ── 每日面試通知（保留函式；排程已於 2026-07-13 停用不呼叫）──
+
+async function handleDailyInterview(env) {
+  const token = env.LINE_CHANNEL_TOKEN;
+  const groupId = env.LINE_GROUP_ID;
+  if (!token || !groupId || !env.HR_TOKEN || !env.DB_INTERVIEW) return;
+  const pad = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_INTERVIEW}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filter: { property: '面試日期', date: { equals: today } },
+      sorts: [{ property: '面試日期', direction: 'ascending' }],
+    }),
+  });
+  const data = await res.json();
+  const records = data.results || [];
+  if (records.length === 0) return;
+  const lines = records.map(r => {
+    const pr = r.properties;
+    const name     = pr['姓名']?.title?.[0]?.plain_text || '未知';
+    const position = pr['應徵職務']?.select?.name || '';
+    const stage    = pr['面試階段']?.select?.name || '';
+    const manager  = pr['負責主管']?.rich_text?.[0]?.plain_text || '';
+    return `• ${name}${position ? '（' + position + '）' : ''}　${stage}${manager ? '　@' + manager : ''}`;
+  });
+  await sendLine(token, groupId,
+    `🗓️ 今日面試安排（${today}）\n\n${lines.join('\n')}\n\n共 ${records.length} 位候選人`
+  );
+}
+
+// ── 每週一面試進度週報（保留函式；排程已停用不呼叫）──
+
+async function handleWeeklyInterview(env) {
+  const token = env.LINE_CHANNEL_TOKEN;
+  const groupId = env.LINE_GROUP_ID;
+  if (!token || !groupId || !env.HR_TOKEN || !env.DB_INTERVIEW) return;
+  const pad = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
+  const fmtDate = d => d ? `${d.slice(5,7)}/${d.slice(8,10)}` : '';
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_INTERVIEW}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filter: { property: '內部過濾日期', date: { is_not_empty: true } },
+      sorts: [{ property: '內部過濾日期', direction: 'ascending' }],
+      page_size: 100,
+    }),
+  });
+  const data = await res.json();
+  const records = data.results || [];
+  const positions = [
+    'AI 內容創作企畫（ AI 應用 / 自動化）(培訓)',
+    '影像內容製作（影像／短影音／AI應用）（培訓轉正）',
+    '影片拍攝剪輯',
+    '工讀生（文書／攝影協助）',
+  ];
+  const groups = {};
+  for (const r of records) {
+    const pr = r.properties;
+    const name     = pr['姓名']?.title?.[0]?.plain_text || '未知';
+    const position = pr['應徵職務']?.rich_text?.[0]?.plain_text || pr['應徵職務']?.select?.name || '其他';
+    const applyDate  = fmtDate(pr['應徵時間']?.date?.start || '');
+    const filterDate = fmtDate(pr['內部過濾日期']?.date?.start || '');
+    const line = `• ${name}${applyDate ? '　投遞 ' + applyDate : ''}${filterDate ? '　內部過濾 ' + filterDate : ''}`;
+    if (!groups[position]) groups[position] = [];
+    groups[position].push(line);
+  }
+  const sections = positions.map(pos => {
+    const candidates = groups[pos] || [];
+    const header = `【${pos}】`;
+    return candidates.length > 0 ? header + '\n' + candidates.join('\n') : header + '\n（本週無候選人）';
+  });
+  for (const [pos, lines] of Object.entries(groups)) {
+    if (!positions.includes(pos)) sections.push(`【${pos}】\n${lines.join('\n')}`);
+  }
+  const total = records.length;
+  await sendLine(token, groupId, `📋 本週面試追蹤（${today}）\n共 ${total} 位候選人\n\n${sections.join('\n\n')}`);
+}
+
+// ── 每日請假通知 ──────────────────────────────────────────────
+
+async function handleDailyLeave(env) {
+  const token = env.LINE_CHANNEL_TOKEN;
+  const groupId = env.LINE_GROUP_ID;
+  const notionToken = env.HR_TOKEN;
+  const dbId = env.DB_LEAVE;
+  if (!token || !groupId || !notionToken || !dbId) return;
+  const pad = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}`;
+  const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + notionToken,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filter: { and: [
+        { property: '開始日期', date: { on_or_before: today } },
+        { property: '結束日期', date: { on_or_after: today } },
+      ]},
+      sorts: [{ property: '開始日期', direction: 'ascending' }],
+    }),
+  });
+  const data = await res.json();
+  const records = data.results || [];
+  let message;
+  if (records.length === 0) {
+    message = `📅 今日請假通知（${today}）\n\n今日無人請假 ✓`;
+  } else {
+    const lines = records.map(r => {
+      const pr = r.properties;
+      const name = pr['姓名']?.rich_text?.[0]?.plain_text || '未知';
+      const type = pr['假別']?.select?.name || '';
+      const days = pr['請假天數']?.number || '';
+      return `• ${name}　${type}${days ? '　' + days + '天' : ''}`;
+    });
+    message = `📅 今日請假通知（${today}）\n\n${lines.join('\n')}\n\n共 ${records.length} 人請假`;
+  }
+  await sendLine(token, groupId, message);
+}
+
+// ── 時間軸備忘（種子娛樂進度時間軸網頁用）──────────────────
+// memoAuth：過渡期同時接受舊 smk 鑰匙（X-Memo-Key）與新公司密碼（X-TL-Pass）。
+// 上線穩定後移除 MEMO_KEY 環境變數，本函式將只認 TIMELINE_PASSWORD。
+
+function memoAuth(request, env) {
+  const byKey  = env.MEMO_KEY && request.headers.get('X-Memo-Key') === env.MEMO_KEY;
+  const byPass = env.TIMELINE_PASSWORD && request.headers.get('X-TL-Pass') === env.TIMELINE_PASSWORD;
+  return byKey || byPass;
+}
+
+async function handleMemoPost(request, env, origin) {
+  if (!memoAuth(request, env)) return errResponse('Unauthorized', origin, 401);
+  if (!env.DB_MEMO || !env.HR_TOKEN) return errResponse('Memo DB not configured', origin, 500);
+  try {
+    const { content, name } = await request.json();
+    if (!content || !content.trim()) return errResponse('content required', origin, 400);
+    const pad = n => String(n).padStart(2, '0');
+    const tw = new Date(Date.now() + 8 * 3600 * 1000);
+    const today = `${tw.getUTCFullYear()}-${pad(tw.getUTCMonth() + 1)}-${pad(tw.getUTCDate())}`;
+    const validNames = ['文娟', '志成', 'Sam', '俊宏'];
+    const res = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        parent: { database_id: env.DB_MEMO },
+        properties: {
+          '內容': { title: [{ text: { content: content.trim().slice(0, 2000) } }] },
+          '姓名': { select: { name: validNames.includes(name) ? name : '其他' } },
+          '日期': { date: { start: today } },
+          '狀態': { select: { name: '新進' } },
+        },
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      return errResponse('Notion error: ' + t.slice(0, 200), origin, 500);
+    }
+    return okResponse({ ok: true }, origin);
+  } catch (e) {
+    return errResponse('memo error: ' + e.message, origin, 500);
+  }
+}
+
+async function handleMemoList(request, env, origin) {
+  if (!memoAuth(request, env)) return errResponse('Unauthorized', origin, 401);
+  if (!env.DB_MEMO || !env.HR_TOKEN) return errResponse('Memo DB not configured', origin, 500);
+  try {
+    const memos = await fetchMemosRaw(env);
+    return okResponse({ memos }, origin);
+  } catch (e) {
+    return errResponse('memo list error: ' + e.message, origin, 500);
+  }
+}
+
+async function handleMemoDelete(request, env, origin) {
+  if (!memoAuth(request, env)) return errResponse('Unauthorized', origin, 401);
+  if (!env.DB_MEMO || !env.HR_TOKEN) return errResponse('Memo DB not configured', origin, 500);
+  try {
+    const { id } = await request.json();
+    if (!id) return errResponse('id required', origin, 400);
+    const headers = { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' };
+    const pageRes = await fetch('https://api.notion.com/v1/pages/' + id, { headers });
+    if (!pageRes.ok) return errResponse('memo not found', origin, 404);
+    const page = await pageRes.json();
+    const parent = (page.parent && page.parent.database_id || '').replace(/-/g, '');
+    if (parent !== (env.DB_MEMO || '').replace(/-/g, '')) return errResponse('Forbidden', origin, 403);
+    const res = await fetch('https://api.notion.com/v1/pages/' + id, {
+      method: 'PATCH', headers, body: JSON.stringify({ archived: true }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      return errResponse('Notion error: ' + t.slice(0, 200), origin, 500);
+    }
+    return okResponse({ ok: true }, origin);
+  } catch (e) {
+    return errResponse('memo delete error: ' + e.message, origin, 500);
+  }
+}
+
+// ── 時間軸整合載入：驗密碼後一次回傳 事件＋備忘＋洽談 ──────────
+// 這是本次資安改造的核心。網頁不再內含金鑰或事件資料，
+// 一律先 POST 密碼到這裡，驗證通過才拿得到內容。
+
+async function fetchTimelineEvents(env) {
+  if (!env.DB_TIMELINE || !env.HR_TOKEN) return [];
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_TIMELINE}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sorts: [{ property: '日期', direction: 'ascending' }], page_size: 100 }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const txt = arr => (arr || []).map(t => t.plain_text || '').join('');
+  const catMap = { '德育': 'deyu', '星展': 'dbs', '星展 DBS': 'dbs', '種子內部': 'seed' };
+  return (data.results || []).map(p => {
+    const pr = p.properties || {};
+    const iso = pr['日期']?.date?.start || '';
+    return {
+      date: iso ? iso.slice(5) : '',
+      cat: catMap[pr['分類']?.select?.name || ''] || 'seed',
+      title: txt(pr['標題']?.title),
+      note: txt(pr['說明']?.rich_text),
+      decided: txt(pr['已明確講好']?.rich_text),
+      pending: txt(pr['還在等']?.rich_text),
+    };
+  }).filter(e => e.title);
+}
+
+async function fetchMemosRaw(env) {
+  if (!env.DB_MEMO || !env.HR_TOKEN) return [];
+  const res = await fetch(`https://api.notion.com/v1/databases/${env.DB_MEMO}/query`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.HR_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filter: { property: '狀態', select: { equals: '新進' } },
+      sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+      page_size: 50,
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.results || []).map(p => ({
+    id: p.id,
+    content: p.properties['內容']?.title?.[0]?.plain_text || '',
+    name: p.properties['姓名']?.select?.name || '',
+    date: p.properties['日期']?.date?.start || '',
+  }));
+}
+
+async function fetchTalksRaw(env) {
+  if (!env.CRM_WORKER_URL || !env.CRM_ACCESS_KEY) return [];
+  try {
+    const res = await fetch(env.CRM_WORKER_URL + '/api/crm/talks', {
+      headers: { 'X-Access-Key': env.CRM_ACCESS_KEY },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.talks || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function handleTimelineLoad(request, env, origin) {
+  if (!env.TIMELINE_PASSWORD) return errResponse('Timeline password not configured', origin, 500);
+  try {
+    const { password } = await request.json();
+    if (password !== env.TIMELINE_PASSWORD) return errResponse('密碼錯誤', origin, 401);
+    const [events, memos, talks] = await Promise.all([
+      fetchTimelineEvents(env),
+      fetchMemosRaw(env),
+      fetchTalksRaw(env),
+    ]);
+    return okResponse({ ok: true, events, memos, talks }, origin);
+  } catch (e) {
+    return errResponse('timeline load error: ' + e.message, origin, 500);
+  }
+}
+
+// ── 主路由 ────────────────────────────────────────────────────
+
+export default {
+  async fetch(request, env) {
+    const origin = request.headers.get('Origin') || '';
+    const { pathname } = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders(origin) });
+    }
+
+    if (pathname === '/api/status') {
+      return okResponse({ ok: true, hr: !!env.HR_TOKEN, gemini: !!env.GEMINI_API_KEY }, origin);
+    }
+
+    if (pathname === '/api/auth')              return handleAuth(request, env, origin);
+    if (pathname === '/api/timeline/load' && request.method === 'POST') return handleTimelineLoad(request, env, origin);
+    if (pathname === '/api/memo' && request.method === 'POST') return handleMemoPost(request, env, origin);
+    if (pathname === '/api/memos')             return handleMemoList(request, env, origin);
+    if (pathname === '/api/memo/delete' && request.method === 'POST') return handleMemoDelete(request, env, origin);
+    if (pathname.startsWith('/api/hr/'))       return handleHR(request, env, pathname, origin);
+    if (pathname === '/api/gemini')            return handleGemini(request, env, origin);
+    if (pathname === '/api/line/webhook')      return handleLineWebhook(request, env);
+    if (pathname === '/api/test-weekly')       return (await handleWeeklyInterview(env), okResponse({ ok: true }, origin));
+
+    return errResponse('Route not found', origin, 404);
+  },
+
+  async scheduled(event, env, ctx) {
+    // 台灣時間 UTC+8 判斷星期幾（0=週日, 6=週六）
+    const taiwanDay = new Date(Date.now() + 8 * 60 * 60 * 1000).getUTCDay();
+    if (taiwanDay === 0 || taiwanDay === 6) return;
+    // 每天：請假通知（面試提醒/週報已於 2026-07-13 停用）
+    ctx.waitUntil(handleDailyLeave(env));
+  },
+};
