@@ -2410,102 +2410,11 @@
         <div class="m-na-text" id="m-next-action-text"></div>
       </div>
 
-      <!-- 承諾事項 / 現況備註 display -->
-      <div class="m-next-action" id="m-commitment-box" style="display:none; background:#fffbeb; border-left-color:#d97706">
-        <div class="m-na-label">承諾事項</div>
-        <div class="m-na-text" id="m-commitment-text"></div>
-      </div>
-      <div class="m-next-action" id="m-notes-box" style="display:none; background:#f8f9fa; border-left-color:#9ca3af">
-        <div class="m-na-label">現況備註</div>
-        <div class="m-na-text" id="m-notes-text"></div>
-      </div>
-
-      <!-- Tabs -->
-      <div class="m-tabs">
-        <div class="m-tab active" onclick="switchModalTab('history', this)">歷史拜訪</div>
-        <div class="m-tab" onclick="switchModalTab('update', this)">更新 / 新增記錄</div>
-      </div>
-
-      <!-- Tab 內容 -->
+      <!-- 歷史日誌（讀取 Notion 客戶頁面內文） -->
       <div class="modal-body">
-
-        <!-- Tab: 歷史拜訪 -->
         <div id="m-panel-history" class="m-tab-panel active">
-          <div id="m-history-list"><div class="empty">載入歷史紀錄中...</div></div>
+          <div id="m-history-list"><div class="empty">載入歷史日誌中...</div></div>
         </div>
-
-        <!-- Tab: 更新 / 新增記錄 -->
-        <div id="m-panel-update" class="m-tab-panel">
-          <div class="m-form-sec">
-            <div class="m-form-title">主檔資料</div>
-            <div class="grid2" style="margin-bottom:10px">
-              <div class="fg"><label>狀態</label>
-                <select id="m-status">
-                  <option>跟進中</option><option>有意願待簽約</option><option>報價中</option>
-                  <option>已報價</option><option>快要簽約</option><option>MOU 待簽</option>
-                  <option>已簽約</option><option>製作中</option><option>戰略夥伴</option><option>暫緩</option>
-                </select>
-              </div>
-              <div class="fg"><label>優先級</label>
-                <select id="m-priority">
-                  <option>本週完成</option><option>本週推進</option><option>跟進中</option>
-                  <option>持續維護</option><option>進行中</option>
-                </select>
-              </div>
-            </div>
-            <div class="fg" style="margin-bottom:10px">
-              <label>下一步行動</label>
-              <input type="text" id="m-action" placeholder="下一步要做什麼...">
-            </div>
-            <div class="fg">
-              <label>下次跟進日期</label>
-              <input type="date" id="m-nextdate">
-            </div>
-            <div class="fg" style="margin-top:10px">
-              <label>承諾事項</label>
-              <input type="text" id="m-commitment" placeholder="雙方承諾的事項...">
-            </div>
-            <div class="fg" style="margin-top:10px">
-              <label>詳細現況備註</label>
-              <textarea id="m-notes" rows="2" placeholder="目前進度、背景資訊..."></textarea>
-            </div>
-          </div>
-
-          <hr class="m-divider">
-
-          <div class="m-form-sec">
-            <div class="m-form-title">新增今日拜訪記錄（選填）</div>
-            <div class="fg" style="margin-bottom:10px">
-              <label>拜訪日期</label>
-              <input type="date" id="m-call-date">
-            </div>
-            <div class="fg" style="margin-bottom:10px">
-              <label>會議摘要</label>
-              <textarea id="m-call-summary" rows="3" placeholder="今日進度、討論結果...（填寫後才會新增拜訪記錄）"></textarea>
-            </div>
-            <div class="grid2">
-              <div class="fg"><label>客戶反應</label>
-                <select id="m-call-reaction">
-                  <option value="">請選擇</option>
-                  <option>正面</option><option>猶豫</option><option>有疑慮</option>
-                </select>
-              </div>
-              <div class="fg"><label>聯繫方式</label>
-                <select id="m-call-contact">
-                  <option value="">請選擇</option>
-                  <option>見面</option><option>電話</option><option>視訊</option>
-                  <option>LINE</option><option>Email</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="m-btn-row">
-            <button id="btn-modal-both" class="m-btn-primary" onclick="submitBothFromModal()">儲存並新增記錄</button>
-            <button id="btn-modal-update" class="m-btn-secondary" onclick="onlyUpdateModal()">僅更新主檔</button>
-          </div>
-        </div>
-
       </div>
     </div>
   </div>
@@ -3669,8 +3578,12 @@
       filtered.map(function(r){
         var amtStr = r.amount != null ? r.currency + ' ' + r.amount.toLocaleString() : '—';
         var nc = NC[r.nature];
-        var rowStyle = nc ? 'border-left:4px solid ' + nc.border + ';background:' + nc.bg + ';' : '';
-        var natureTag = nc ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + nc.border + ';color:' + nc.tag + ';font-weight:600">' + nc.label + '</span>' : '';
+        var rowStyle = nc
+          ? 'border-left:4px solid ' + nc.border + ';background:' + nc.bg + ';'
+          : '';
+        var natureTag = nc
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + nc.border + ';color:' + nc.tag + ';font-weight:600">' + nc.label + '</span>'
+          : '';
         return '<div class="client-row" style="flex-direction:column;align-items:stretch;gap:6px;' + rowStyle + '">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
             '<div>' +
@@ -4030,32 +3943,8 @@
     } else {
       naBox.style.display = 'none';
     }
-    // 承諾事項 display
-    var commitBox = document.getElementById('m-commitment-box');
-    if (c.commitment) { document.getElementById('m-commitment-text').textContent = c.commitment; commitBox.style.display = ''; }
-    else { commitBox.style.display = 'none'; }
-    // 現況備註 display
-    var notesBox = document.getElementById('m-notes-box');
-    if (c.notes) { document.getElementById('m-notes-text').textContent = c.notes; notesBox.style.display = ''; }
-    else { notesBox.style.display = 'none'; }
-
-    // 表單預填
-    document.getElementById('m-status').value = c.status || '跟進中';
-    document.getElementById('m-priority').value = c.priority || '跟進中';
-    document.getElementById('m-action').value = c.action || '';
-    document.getElementById('m-nextdate').value = c.nextdate || '';
-    document.getElementById('m-commitment').value = c.commitment || '';
-    document.getElementById('m-notes').value = c.notes || '';
-    document.getElementById('m-call-date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('m-call-summary').value = '';
-    document.getElementById('m-call-reaction').value = '';
-    document.getElementById('m-call-contact').value = '';
-
-    // 預設顯示歷史 tab
-    switchModalTab('history', document.querySelector('.m-tab'));
-
     document.getElementById('modal-client').classList.add('open');
-    loadClientHistory(id, c.name);
+    loadClientLog(id);
   }
 
   function closeClientModal() {
@@ -4070,60 +3959,53 @@
     document.getElementById('m-panel-' + name).classList.add('active');
   }
 
-  function loadClientHistory(clientId, clientName, force) {
+  // 歷史日誌：讀取客戶 Notion 頁面內文（📒 歷史日誌，新的在上）
+  function loadClientLog(clientId, force) {
     var listEl = document.getElementById('m-history-list');
 
     // 快取命中（非強制刷新）
     if (!force && _historyCache[clientId]) {
-      renderHistory(_historyCache[clientId]);
+      renderLog(_historyCache[clientId]);
       return;
     }
 
-    listEl.innerHTML = '<div class="empty">載入歷史紀錄中...</div>';
-    var filter = { property: '客戶', relation: { contains: clientId } };
-    var body = JSON.stringify({ filter: filter, sorts: [{ property: '拜訪日期', direction: 'descending' }] });
-
-    fetch(crmApiBase + '/api/crm/databases/' + nDBs.call + '/query', {
-      method: 'POST', headers: crmH(),
-      body: body
+    listEl.innerHTML = '<div class="empty">載入歷史日誌中...</div>';
+    fetch(crmApiBase + '/api/crm/blocks/' + clientId + '/children?page_size=100', {
+      headers: crmH()
     }).then(function(r){ return r.json(); })
       .then(function(data){
-        if (!data.results || data.results.length === 0) {
-          _historyCache[clientId] = [];
-          listEl.innerHTML = '<div class="empty">尚無歷史紀錄</div>';
-          return;
-        }
-        _historyCache[clientId] = data.results;
-        renderHistory(data.results);
+        var lines = (data.results || []).map(function(b){
+          var seg = (b.paragraph && b.paragraph.rich_text)
+            || (b.heading_1 && b.heading_1.rich_text)
+            || (b.heading_2 && b.heading_2.rich_text)
+            || (b.heading_3 && b.heading_3.rich_text)
+            || (b.bulleted_list_item && b.bulleted_list_item.rich_text)
+            || [];
+          return seg.map(function(t){ return t.plain_text || ''; }).join('').trim();
+        }).filter(function(l){ return l && l.indexOf('歷史日誌') === -1; });
+        _historyCache[clientId] = lines;
+        renderLog(lines);
       }).catch(function(){
-        listEl.innerHTML = '<div class="empty">無法讀取歷史紀錄</div>';
+        listEl.innerHTML = '<div class="empty">無法讀取歷史日誌</div>';
       });
   }
 
-  function renderHistory(results) {
+  function renderLog(lines) {
     var listEl = document.getElementById('m-history-list');
-    if (!results.length) { listEl.innerHTML = '<div class="empty">尚無歷史紀錄</div>'; return; }
+    if (!lines.length) {
+      listEl.innerHTML = '<div class="empty">尚無歷史日誌——到 Notion 客戶頁面內文加一行「日期　內容」即可</div>';
+      return;
+    }
     var html = '<div class="timeline">';
-    results.forEach(function(p, i){
-      var pr = p.properties;
-      var date       = gp(pr, '拜訪日期', 'date') || '未知日期';
-      var summary    = gp(pr, '對話摘要', 'text') || '（無內容）';
-      var contact    = gp(pr, '聯繫方式', 'select');
-      var reaction   = gp(pr, '客戶反應', 'select');
-      var commitment = gp(pr, '承諾事項', 'text');
-      var nextAction = gp(pr, '下一步行動', 'text');
-      var owner      = gp(pr, '負責人', 'select');
-      var isOld = i > 0;
+    lines.forEach(function(l, i){
+      var m = /^([0-9]{1,2}\/[0-9]{1,2}|[0-9]{1,2}月[^\s　]*)[\s　]+([\s\S]*)$/.exec(l);
+      var date = m ? m[1] : '';
+      var content = m ? m[2] : l;
       html += '<div class="timeline-item">' +
-        '<div class="tl-left"><div class="tl-dot' + (isOld ? ' old' : '') + '"></div><div class="tl-line"></div></div>' +
+        '<div class="tl-left"><div class="tl-dot' + (i > 0 ? ' old' : '') + '"></div><div class="tl-line"></div></div>' +
         '<div class="tl-body">' +
-          '<div class="tl-date">' + esc(date) + (contact ? '　' + esc(contact) : '') + (owner ? '　' + esc(owner) : '') + '</div>' +
-          '<div class="tl-content">' + esc(summary) + '</div>' +
-          '<div class="tl-meta">' +
-            (reaction   ? '<span class="tl-tag">' + esc(reaction)   + '</span>' : '') +
-            (commitment ? '<span class="tl-tag">承諾：' + esc(commitment) + '</span>' : '') +
-            (nextAction ? '<span class="tl-tag">→ ' + esc(nextAction) + '</span>' : '') +
-          '</div>' +
+          (date ? '<div class="tl-date">' + esc(date) + '</div>' : '') +
+          '<div class="tl-content">' + esc(content) + '</div>' +
         '</div></div>';
     });
     html += '</div>';
