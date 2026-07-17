@@ -295,7 +295,7 @@ if(!/[?&]v=/.test(location.search)){
     <section class="block" data-key="talks" id="talks-block">
       <div class="bhead">
         <span class="drag-handle" title="拖曳調整順序">⠿</span>
-        <h2>洽談中 <span class="sub-note">點客戶可展開概況｜開頁即時同步自 Notion CRM</span></h2>
+        <h2>洽談中 <span class="sub-note">點客戶可展開歷史日誌｜開頁即時同步自 Notion CRM</span></h2>
         <button class="toggle-btn" title="收合／展開">−</button>
       </div>
       <div class="bbody"><div id="talks"></div></div>
@@ -540,6 +540,18 @@ function daysSinceISO(iso){
   return Math.floor((Date.now() - t.getTime()) / 86400000);
 }
 
+/* 歷史日誌：把「07/17　內容」拆成日期＋內文的小時間軸 */
+function logHtml(t){
+  const lines = t.log || [];
+  if(!lines.length) return `<div style="color:var(--sub)">（尚無歷史日誌——到 Notion 客戶頁面內文加一行「日期　內容」即可）</div>`;
+  return `<div class="hist" style="margin-top:6px">${lines.map(l=>{
+    const m = /^([0-9]{1,2}\/[0-9]{1,2}|[0-9]{1,2}月[^\s　]*)[\s　]+([\s\S]*)$/.exec(l);
+    return m
+      ? `<div class="h-item"><span class="h-date">${escapeHtml(m[1])}</span>${escapeHtml(m[2])}</div>`
+      : `<div class="h-item">${escapeHtml(l)}</div>`;
+  }).join("")}</div>`;
+}
+
 function renderTalks(){
   const box = document.getElementById("talks");
   const closedBox = document.getElementById("closed-items");
@@ -558,13 +570,12 @@ function renderTalks(){
       <div class="now">${escapeHtml(t.action||"（尚未填下一步行動）")}<div class="meta">最近聯繫：${fmtMD(t.last)}${late}${t.next ? "　下次跟進：" + fmtMD(t.next) : ""}</div></div>
       <span class="chev">▶</span>
       <div class="detail">
-        <div class="overview"><span class="ov-label">概 況 說 明</span>${escapeHtml(t.note||"（待補）")}</div>
-        ${t.promise ? `<div class="overview"><span class="ov-label">承 諾 事 項</span>${escapeHtml(t.promise)}</div>` : ""}
+        <div class="overview"><span class="ov-label">歷 史 日 誌</span>${logHtml(t)}</div>
       </div>
     </div>`;
   }).join("") : `<div class="empty-hint">CRM 目前沒有洽談中客戶</div>`;
   closedBox.innerHTML = closed.length
-    ? closed.map(t=>`<div class="closed-item"><div class="t">${escapeHtml(t.name)}｜${escapeHtml(t.status)}</div><div class="d">${escapeHtml(t.note||t.action||"")}</div></div>`).join("")
+    ? closed.map(t=>`<div class="closed-item"><div class="t">${escapeHtml(t.name)}｜${escapeHtml(t.status)}</div><div class="d">${escapeHtml((t.log&&t.log[0])||t.action||"")}</div></div>`).join("")
     : `<div class="empty-hint">尚無結案／暫緩紀錄</div>`;
 }
 
