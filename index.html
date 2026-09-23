@@ -1360,25 +1360,28 @@
     #page-crm-dashboard .client-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     .crm-list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0 8px; }
     .crm-list-toolbar .ct { margin: 0 auto 0 0; font-size: 20px; }
+    .crm-expand-hint { font-size: 14px; color: var(--text2); }
     .crm-sort-label { display: flex; align-items: center; gap: 8px; font-size: 16px; white-space: nowrap; }
     #crm-sort { width: auto; min-height: 44px; }
     #crm-sort-note { font-size: 14px; line-height: 1.6; color: var(--text2); margin: 4px 0 12px; }
-    #modal-client .modal-content { max-width: 880px; overflow-y: auto; }
-    #modal-client .modal-body { flex: 0 0 auto; overflow: visible; }
-    #modal-client .modal-hdr { gap: 16px; }
-    #modal-client .m-client-title { min-width: 0; }
-    #modal-client .m-client-name { font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; }
-    #modal-client .m-drive-link,
-    #modal-client .m-date-pill,
-    #modal-client .m-badge,
-    #modal-client .m-na-label,
-    #modal-client .tl-date { font-size: 14px; line-height: 1.6; }
-    #modal-client .tl-date { color: var(--text2); }
-    #modal-client .btn { font-size: 16px; min-height: 44px; flex-shrink: 0; }
-    #modal-client .m-next-action { padding: 14px 16px; }
-    #modal-client .m-na-text,
-    #modal-client .tl-content { font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-line; }
-    #modal-client .timeline-item { padding-bottom: 24px; }
+    #page-crm-dashboard .client-card { border-bottom: 1px solid var(--border); }
+    #page-crm-dashboard .client-card:last-child { border-bottom: 0; }
+    #page-crm-dashboard .client-card > summary { list-style: none; border: 0; position: relative; padding-right: 36px; }
+    #page-crm-dashboard .client-card > summary::-webkit-details-marker { display: none; }
+    #page-crm-dashboard .client-card > summary:hover { margin: 0; padding-left: 0; padding-right: 36px; }
+    #page-crm-dashboard .client-chevron { position: absolute; right: 4px; top: 28px; width: 20px; height: 20px; color: var(--text2); transition: transform .15s; }
+    #page-crm-dashboard .client-card[open] .client-chevron { transform: rotate(90deg); }
+    #page-crm-dashboard .client-card[open] > summary { padding-bottom: 16px; }
+    #page-crm-dashboard .client-detail { background: var(--bg); padding: 20px 24px; margin-bottom: 20px; border-radius: 8px; }
+    .client-detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .client-detail-head h3 { font-size: 18px; font-weight: 600; margin: 0; }
+    .client-detail-head a { font-size: 14px; line-height: 1.6; color: var(--accent); text-underline-offset: 3px; }
+    .client-extra { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--text2); }
+    #page-crm-dashboard .tl-date { font-size: 14px; line-height: 1.6; color: var(--text2); }
+    #page-crm-dashboard .tl-content { font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-line; }
+    #page-crm-dashboard .timeline-item { padding-bottom: 24px; }
+    #page-crm-dashboard .client-detail .empty { font-size: 16px; padding: 12px 0; text-align: left; }
+    @media (prefers-reduced-motion: reduce) { #page-crm-dashboard .client-chevron { transition: none; } }
     @media (max-width: 720px) {
       #page-crm-dashboard .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
       #page-crm-dashboard .client-row { flex-direction: column; gap: 10px; }
@@ -1387,8 +1390,8 @@
       .crm-list-toolbar .ct { flex-basis: 100%; }
       .crm-sort-label { flex: 1; }
       #crm-sort { min-width: 0; width: 100%; }
-      #modal-client .modal-content { width: calc(100% - 24px); max-height: 94dvh; }
-      #modal-client .m-date-pills { width: 100%; margin-left: 0; }
+      #page-crm-dashboard .client-detail { padding: 18px 14px; }
+      #page-crm-dashboard .client-card > summary .client-tags { padding-right: 0; }
     }
   </style>
 </head>
@@ -2132,6 +2135,7 @@
         <div class="card" style="padding:0 24px">
           <div class="crm-list-toolbar">
             <span class="ct">客戶列表</span>
+            <span class="crm-expand-hint">點選客戶可展開歷史日誌</span>
             <label class="crm-sort-label" for="crm-sort">排序
               <select id="crm-sort" onchange="renderClients()" aria-describedby="crm-sort-note">
                 <option value="followup">優先跟進</option>
@@ -2442,40 +2446,6 @@
     </svg>
   </button>
   <div class="toast" id="toast"></div>
-
-  <!-- 客戶詳情彈窗 -->
-  <div class="modal" id="modal-client">
-    <div class="modal-content">
-
-      <!-- 標題列 -->
-      <div class="modal-hdr">
-        <div class="m-client-title">
-          <div class="m-client-name" id="m-client-name">客戶詳情</div>
-          <a id="m-drive-link" href="#" target="_blank" class="m-drive-link" style="display:none">
-            <svg viewBox="0 0 24 24"><path fill="#FFC107" d="M15.39,10.15l-4.57-7.91c-0.27-0.47-0.78-0.75-1.32-0.75H4.51c-0.54,0-1.05,0.28-1.32,0.75L0.27,7.63c-0.27,0.47-0.27,1.04,0,1.5l2.92,5.06c0.27,0.47,0.78,0.75,1.32,0.75h4.51l4.57-7.91C15.66,10.56,15.66,10.15,15.39,10.15z"/><path fill="#2196F3" d="M23.73,14.87l-2.92-5.06c-0.27-0.47-0.78-0.75-1.32-0.75h-9.02l-4.57,7.91c-0.27,0.47-0.27,1.04,0,1.5l2.92,5.06c0.27,0.47,0.78,0.75,1.32,0.75h9.02c0.54,0,1.05-0.28,1.32-0.75l2.92-5.06C24,15.91,24,15.34,23.73,14.87z"/><path fill="#4CAF50" d="M15.39,10.15H6.37l4.57,7.91h9.02L15.39,10.15z"/></svg>
-            <span>Google Drive 搜尋</span>
-          </a>
-        </div>
-        <button class="btn btnsm" onclick="closeClientModal()">關閉</button>
-      </div>
-
-      <!-- 狀態摘要條 -->
-      <div class="m-status-bar" id="m-status-bar"></div>
-
-      <!-- 下一步行動 highlight -->
-      <div class="m-next-action" id="m-next-action-box" style="display:none">
-        <div class="m-na-label">下一步行動</div>
-        <div class="m-na-text" id="m-next-action-text"></div>
-      </div>
-
-      <!-- 歷史日誌（讀取 Notion 客戶頁面內文） -->
-      <div class="modal-body">
-        <div id="m-panel-history" class="m-tab-panel active">
-          <div id="m-history-list"><div class="empty">載入歷史日誌中...</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- 收據附件彈窗 -->
   <div class="modal" id="modal-receipts">
@@ -3509,8 +3479,12 @@
   var _clientsCacheTs = 0;
   var _CLIENTS_TTL = 5 * 60 * 1000; // 5 分鐘
   var _historyCache = {}; // { clientId: results[] }
+  var _expandedClients = {};
+  var _historyRequests = {};
+  var _historyRevision = 0;
 
   function loadClients(force) {
+    if (force) { _historyRevision++; _historyCache = {}; _historyRequests = {}; }
     var el = document.getElementById('client-list');
     if (!crmKey || !nDBs.crm) {
         el.innerHTML = '<div class="empty">請先到「Notion 設定」填入 CRM 存取密鑰與 CRM 資料庫 ID 並儲存</div>';
@@ -3968,18 +3942,34 @@
     el.innerHTML = sortedClients(CRM_DATA, mode).map(function(c){
       var sc = STATUS_COLOR[c.status] || 'tgray';
       var pc = PRIORITY_COLOR[c.priority] || 'tgray';
-      return '<div class="client-row" role="button" tabindex="0" onclick="openClientModal(\'' + esc(c.id) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}">' +
-        '<div class="client-info">' +
-          '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
-          '<div class="client-meta">' + esc(c.action || '尚無下一步') + '</div>' +
-          '<div class="client-dates">最近聯繫：' + esc(c.lastdate || '未填寫') + (c.nextdate ? ' · 下次跟進：' + esc(c.nextdate) : '') + '</div>' +
+      var extra = [
+        c.reaction ? '客戶反應：' + c.reaction : '',
+        c.contact ? '聯繫方式：' + c.contact : '',
+        c.amount ? '金額：NT$' + c.amount.toLocaleString() : ''
+      ].filter(Boolean);
+      return '<details class="client-card" data-client-id="' + esc(c.id) + '"' + (_expandedClients[c.id] ? ' open' : '') + ' ontoggle="toggleClientDetail(this)">' +
+        '<summary class="client-row">' +
+          '<div class="client-info">' +
+            '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
+            '<div class="client-meta">' + esc(c.action || '尚無下一步') + '</div>' +
+            '<div class="client-dates">最近聯繫：' + esc(c.lastdate || '未填寫') + (c.nextdate ? ' · 下次跟進：' + esc(c.nextdate) : '') + '</div>' +
+          '</div>' +
+          '<div class="client-tags">' +
+            (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + esc(c.status) + '</span>' : '') +
+            (c.priority ? '<span class="tag ' + pc + '"><small style="opacity:0.7">優先：</small>' + esc(c.priority) + '</span>' : '') +
+          '</div>' +
+          '<svg class="client-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>' +
+        '</summary>' +
+        '<div class="client-detail">' +
+          '<div class="client-detail-head"><h3>歷史日誌</h3><a href="https://drive.google.com/drive/search?q=' + encodeURIComponent(c.name || '') + '" target="_blank" rel="noopener noreferrer">Google Drive 搜尋</a></div>' +
+          (extra.length ? '<div class="client-extra">' + extra.map(function(value){ return '<span>' + esc(value) + '</span>'; }).join('') + '</div>' : '') +
+          '<div id="client-history-' + esc(c.id) + '" aria-live="polite"><div class="empty">展開後載入歷史日誌</div></div>' +
         '</div>' +
-        '<div class="client-tags">' +
-          (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + esc(c.status) + '</span>' : '') +
-          (c.priority ? '<span class="tag ' + pc + '"><small style="opacity:0.7">優先：</small>' + esc(c.priority) + '</span>' : '') +
-        '</div>' +
-      '</div>';
+      '</details>';
     }).join('');
+    Object.keys(_expandedClients).forEach(function(id){
+      if (_expandedClients[id] && document.getElementById('client-history-' + id)) loadClientLog(id);
+    });
   }
 
   function goUpdate(id) {
@@ -3993,96 +3983,63 @@
     navTo('crm-update', null);
   }
 
-  // --- Modal Logic ---
-  function openClientModal(id) {
-    selectedClientId = id;
-    var c = CRM_DATA.filter(function(x){ return x.id === id; })[0];
-    if (!c) return;
-
-    // 標題
-    document.getElementById('m-client-name').textContent = c.name;
-    var driveEl = document.getElementById('m-drive-link');
-    driveEl.href = 'https://drive.google.com/drive/search?q=' + encodeURIComponent(c.name);
-    driveEl.style.display = '';
-
-    // 狀態摘要條
-    var REACTION_COLOR = { '正面': 'tgreen', '猶豫': 'tyellow', '有疑慮': 'tred' };
-    var CONTACT_COLOR  = { '電話': 'tblue', '視訊': 'tblue', '見面': 'tgreen', 'LINE': 'tgreen', 'Email': 'tgray' };
-    var sc = STATUS_COLOR[c.status] || 'tgray';
-    var pc = PRIORITY_COLOR[c.priority] || 'tgray';
-    var rc = REACTION_COLOR[c.reaction] || '';
-    var cc = CONTACT_COLOR[c.contact]  || 'tgray';
-    var bar = '';
-    if (c.status)   bar += '<span class="tag ' + sc + ' m-badge">' + esc(c.status)   + '</span>';
-    if (c.priority) bar += '<span class="tag ' + pc + ' m-badge">' + esc(c.priority) + '</span>';
-    if (c.reaction) bar += '<span class="tag ' + rc + ' m-badge">' + esc(c.reaction) + '</span>';
-    if (c.contact)  bar += '<span class="tag ' + cc + ' m-badge">' + esc(c.contact)  + '</span>';
-    var pills = '';
-    if (c.lastdate) pills += '<span class="m-date-pill">上次 <span>' + esc(c.lastdate) + '</span></span>';
-    if (c.nextdate) pills += '<span class="m-date-pill">跟進 <span>' + esc(c.nextdate) + '</span></span>';
-    if (c.amount)   pills += '<span class="m-date-pill">金額 <span>NT$' + c.amount.toLocaleString() + '</span></span>';
-    if (pills) bar += '<div class="m-date-pills">' + pills + '</div>';
-    document.getElementById('m-status-bar').innerHTML = bar;
-
-    // 下一步行動
-    var naBox = document.getElementById('m-next-action-box');
-    if (c.action) {
-      document.getElementById('m-next-action-text').textContent = c.action;
-      naBox.style.display = '';
-    } else {
-      naBox.style.display = 'none';
-    }
-    document.getElementById('modal-client').classList.add('open');
-    loadClientLog(id);
+  // 客戶詳情直接在列表內展開，各客戶分別載入與快取。
+  function toggleClientDetail(card) {
+    var id = card.dataset.clientId;
+    _expandedClients[id] = card.open;
+    if (card.open) loadClientLog(id);
   }
 
-  function closeClientModal() {
-    document.getElementById('modal-client').classList.remove('open');
-    if (selectedClientId) { delete _historyCache[selectedClientId]; selectedClientId = ''; }
-  }
-
-  function switchModalTab(name, el) {
-    document.querySelectorAll('.m-tab').forEach(function(t){ t.classList.remove('active'); });
-    document.querySelectorAll('.m-tab-panel').forEach(function(p){ p.classList.remove('active'); });
-    el.classList.add('active');
-    document.getElementById('m-panel-' + name).classList.add('active');
-  }
-
-  // 歷史日誌：讀取客戶 Notion 頁面內文（📒 歷史日誌，新的在上）
   function loadClientLog(clientId, force) {
-    var listEl = document.getElementById('m-history-list');
-
-    // 快取命中（非強制刷新）
+    var listEl = document.getElementById('client-history-' + clientId);
+    if (!listEl) return Promise.resolve();
     if (!force && _historyCache[clientId]) {
-      renderLog(_historyCache[clientId]);
-      return;
+      renderLog(_historyCache[clientId], listEl);
+      return Promise.resolve();
     }
-
+    if (_historyRequests[clientId]) return _historyRequests[clientId];
     listEl.innerHTML = '<div class="empty">載入歷史日誌中...</div>';
-    fetch(crmApiBase + '/api/crm/blocks/' + clientId + '/children?page_size=100', {
+    var revision = _historyRevision;
+    var request = fetch(crmApiBase + '/api/crm/blocks/' + clientId + '/children?page_size=100', {
       headers: crmH()
-    }).then(function(r){ return r.json(); })
-      .then(function(data){
-        var lines = (data.results || []).map(function(b){
-          var seg = (b.paragraph && b.paragraph.rich_text)
-            || (b.heading_1 && b.heading_1.rich_text)
-            || (b.heading_2 && b.heading_2.rich_text)
-            || (b.heading_3 && b.heading_3.rich_text)
-            || (b.bulleted_list_item && b.bulleted_list_item.rich_text)
-            || [];
-          return seg.map(function(t){ return t.plain_text || ''; }).join('').trim();
-        }).filter(function(l){ return l && l.indexOf('歷史日誌') === -1; });
-        _historyCache[clientId] = lines;
-        renderLog(lines);
-      }).catch(function(){
-        listEl.innerHTML = '<div class="empty">無法讀取歷史日誌</div>';
-      });
+    }).then(function(r){
+      if (!r.ok) throw new Error('無法讀取歷史日誌');
+      return r.json();
+    }).then(function(data){
+      if (!Array.isArray(data.results)) throw new Error('歷史日誌格式不完整');
+      var lines = data.results.map(function(b){
+        var seg = (b.paragraph && b.paragraph.rich_text)
+          || (b.heading_1 && b.heading_1.rich_text)
+          || (b.heading_2 && b.heading_2.rich_text)
+          || (b.heading_3 && b.heading_3.rich_text)
+          || (b.bulleted_list_item && b.bulleted_list_item.rich_text)
+          || [];
+        return seg.map(function(t){ return t.plain_text || ''; }).join('').trim();
+      }).filter(function(l){ return l && l.indexOf('歷史日誌') === -1; });
+      if (revision !== _historyRevision) return;
+      _historyCache[clientId] = lines;
+      var target = document.getElementById('client-history-' + clientId);
+      if (target) renderLog(lines, target);
+    }).catch(function(){
+      if (revision !== _historyRevision) return;
+      var target = document.getElementById('client-history-' + clientId);
+      if (!target) return;
+      target.innerHTML = '<div class="empty">無法讀取歷史日誌，請再試一次。</div>';
+      var retry = document.createElement('button');
+      retry.className = 'btn btnsm';
+      retry.textContent = '重新載入';
+      retry.onclick = function(){ loadClientLog(clientId, true); };
+      target.appendChild(retry);
+    }).finally(function(){
+      if (_historyRequests[clientId] === request) delete _historyRequests[clientId];
+    });
+    _historyRequests[clientId] = request;
+    return request;
   }
 
-  function renderLog(lines) {
-    var listEl = document.getElementById('m-history-list');
+  function renderLog(lines, listEl) {
     if (!lines.length) {
-      listEl.innerHTML = '<div class="empty">尚無歷史日誌——到 Notion 客戶頁面內文加一行「日期　內容」即可</div>';
+      listEl.innerHTML = '<div class="empty">尚無歷史日誌</div>';
       return;
     }
     var html = '<div class="timeline">';
@@ -4097,8 +4054,7 @@
           '<div class="tl-content">' + esc(content) + '</div>' +
         '</div></div>';
     });
-    html += '</div>';
-    listEl.innerHTML = html;
+    listEl.innerHTML = html + '</div>';
   }
 
   function submitUpdateFromModal() {
