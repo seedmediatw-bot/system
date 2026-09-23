@@ -1340,6 +1340,56 @@
     @media (max-width: 480px) { .m-date-pills { margin-left: 0; } }
     /* --- Modal & Timeline END --- */
 
+    /* CRM reading scale: scoped so HR screens keep their existing layout. */
+    #nav-crm .nav-item { font-size: 16px; }
+    [id^="page-crm-"] .ph p,
+    [id^="page-crm-"] .fg label,
+    [id^="page-crm-"] .statl { font-size: 16px; }
+    [id^="page-crm-"] input,
+    [id^="page-crm-"] select,
+    [id^="page-crm-"] textarea,
+    [id^="page-crm-"] .btn { font-size: 16px; }
+    #page-crm-dashboard .client-row { align-items: flex-start; padding: 22px 0; gap: 20px; }
+    #page-crm-dashboard .client-row:hover { padding: 22px 24px; }
+    #page-crm-dashboard .client-name { font-size: 20px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+    #page-crm-dashboard .client-meta { font-size: 18px; color: var(--text); line-height: 1.8; margin-top: 8px; max-width: 65ch; overflow-wrap: anywhere; }
+    #page-crm-dashboard .client-dates { font-size: 14px; color: var(--text2); line-height: 1.6; margin-top: 8px; }
+    #page-crm-dashboard .client-tags { max-width: 180px; padding-top: 4px; }
+    #page-crm-dashboard .tag { font-size: 14px; line-height: 1.5; white-space: normal; }
+    #page-crm-dashboard .tag small { font-size: inherit; }
+    #page-crm-dashboard .client-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .crm-list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0 8px; }
+    .crm-list-toolbar .ct { margin: 0 auto 0 0; font-size: 20px; }
+    .crm-sort-label { display: flex; align-items: center; gap: 8px; font-size: 16px; white-space: nowrap; }
+    #crm-sort { width: auto; min-height: 44px; }
+    #crm-sort-note { font-size: 14px; line-height: 1.6; color: var(--text2); margin: 4px 0 12px; }
+    #modal-client .modal-content { max-width: 880px; overflow-y: auto; }
+    #modal-client .modal-body { flex: 0 0 auto; overflow: visible; }
+    #modal-client .modal-hdr { gap: 16px; }
+    #modal-client .m-client-title { min-width: 0; }
+    #modal-client .m-client-name { font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; }
+    #modal-client .m-drive-link,
+    #modal-client .m-date-pill,
+    #modal-client .m-badge,
+    #modal-client .m-na-label,
+    #modal-client .tl-date { font-size: 14px; line-height: 1.6; }
+    #modal-client .tl-date { color: var(--text2); }
+    #modal-client .btn { font-size: 16px; min-height: 44px; flex-shrink: 0; }
+    #modal-client .m-next-action { padding: 14px 16px; }
+    #modal-client .m-na-text,
+    #modal-client .tl-content { font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-line; }
+    #modal-client .timeline-item { padding-bottom: 24px; }
+    @media (max-width: 720px) {
+      #page-crm-dashboard .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      #page-crm-dashboard .client-row { flex-direction: column; gap: 10px; }
+      #page-crm-dashboard .client-tags { max-width: none; justify-content: flex-start; padding: 0; }
+      .crm-list-toolbar { gap: 12px 8px; }
+      .crm-list-toolbar .ct { flex-basis: 100%; }
+      .crm-sort-label { flex: 1; }
+      #crm-sort { min-width: 0; width: 100%; }
+      #modal-client .modal-content { width: calc(100% - 24px); max-height: 94dvh; }
+      #modal-client .m-date-pills { width: 100%; margin-left: 0; }
+    }
   </style>
 </head>
 
@@ -2080,10 +2130,18 @@
           <div class="stat"><div class="statn" id="d-amount">—</div><div class="statl">潛在金額(萬)</div></div>
         </div>
         <div class="card" style="padding:0 24px">
-          <div style="padding:16px 0 12px;display:flex;align-items:center;justify-content:space-between">
-            <span class="ct" style="margin:0">客戶列表</span>
-            <button class="btn btnsm" onclick="loadClients()">↻ 重新整理</button>
+          <div class="crm-list-toolbar">
+            <span class="ct">客戶列表</span>
+            <label class="crm-sort-label" for="crm-sort">排序
+              <select id="crm-sort" onchange="renderClients()" aria-describedby="crm-sort-note">
+                <option value="followup">優先跟進</option>
+                <option value="recent">最近聯繫</option>
+                <option value="name">客戶名稱</option>
+              </select>
+            </label>
+            <button class="btn btnsm" onclick="loadClients(true)">↻ 重新整理</button>
           </div>
+          <p id="crm-sort-note" aria-live="polite">依優先級排序，同級先顯示最久未聯繫；暫停、結案置後。</p>
           <div id="client-list"><div class="empty">載入中...</div></div>
         </div>
       </div>
@@ -3874,16 +3932,47 @@
   var STATUS_COLOR = { '已簽約':'tgreen','製作中':'tgreen','快要簽約':'tyellow','有意願待簽約':'tyellow','MOU 待簽':'tyellow','報價中':'tblue','已報價':'tblue','跟進中':'tgray','暫緩':'tred','戰略夥伴':'tblue' };
   var PRIORITY_COLOR = { '本週完成':'tred','本週推進':'tyellow','跟進中':'tgray','持續維護':'tgray','進行中':'tgreen' };
 
+  function sortedClients(clients, mode) {
+    var ranks = { '本週完成': 0, '本週推進': 1, '進行中': 2, '跟進中': 3, '持續維護': 4, '暫停': 6, '暫緩': 6, '結案': 7, '結束': 7 };
+    function rank(c) {
+      var state = /^(暫停|暫緩|結案|結束)$/.test(c.status) ? c.status : c.priority;
+      return Object.prototype.hasOwnProperty.call(ranks, state) ? ranks[state] : 5;
+    }
+    function dateValue(c) {
+      var value = Date.parse(c.lastdate || '');
+      return Number.isFinite(value) ? value : null;
+    }
+    return clients.slice().sort(function(a, b) {
+      if (mode === 'followup' && rank(a) !== rank(b)) return rank(a) - rank(b);
+      if (mode !== 'name') {
+        var ad = dateValue(a), bd = dateValue(b);
+        if (ad === null && bd !== null) return 1;
+        if (ad !== null && bd === null) return -1;
+        if (ad !== null && bd !== null && ad !== bd) return mode === 'recent' ? bd - ad : ad - bd;
+      }
+      return (a.name || '').localeCompare(b.name || '', 'zh-Hant', { numeric: true })
+        || (a.id || '').localeCompare(b.id || '');
+    });
+  }
+
   function renderClients() {
     var el = document.getElementById('client-list');
+    var mode = document.getElementById('crm-sort').value;
+    var notes = {
+      followup: '依優先級排序，同級先顯示最久未聯繫；暫停、結案置後。未填日期排在同級有日期的案件之後。',
+      recent: '依最近聯繫日期由新到舊；未填日期置後，同日依客戶名稱排序。',
+      name: '依客戶名稱排序，中文採繁體中文排序，數字按大小排列。'
+    };
+    document.getElementById('crm-sort-note').textContent = notes[mode];
     if (!CRM_DATA.length) { el.innerHTML = '<div class="empty">沒有客戶資料</div>'; return; }
-    el.innerHTML = CRM_DATA.map(function(c){
+    el.innerHTML = sortedClients(CRM_DATA, mode).map(function(c){
       var sc = STATUS_COLOR[c.status] || 'tgray';
       var pc = PRIORITY_COLOR[c.priority] || 'tgray';
-      return '<div class="client-row" onclick="openClientModal(\'' + esc(c.id) + '\')">' +
+      return '<div class="client-row" role="button" tabindex="0" onclick="openClientModal(\'' + esc(c.id) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}">' +
         '<div class="client-info">' +
           '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
-          '<div class="client-meta">' + esc(c.action || '尚無下一步') + (c.nextdate ? ' · 跟進：' + esc(c.nextdate) : '') + '</div>' +
+          '<div class="client-meta">' + esc(c.action || '尚無下一步') + '</div>' +
+          '<div class="client-dates">最近聯繫：' + esc(c.lastdate || '未填寫') + (c.nextdate ? ' · 下次跟進：' + esc(c.nextdate) : '') + '</div>' +
         '</div>' +
         '<div class="client-tags">' +
           (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + esc(c.status) + '</span>' : '') +
