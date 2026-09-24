@@ -2467,7 +2467,7 @@
 
     function selectSystem(sys) {
       pendingSystem = sys;
-      if (sessionStorage.getItem(sys + '_auth') === '1') {
+      if (sessionStorage.getItem(sys + '_auth') === '1' && (sys === 'crm' ? crmKey : hrKey)) {
         enterSystem(sys);
       } else {
         document.getElementById('login-system-name').textContent = SYS_NAMES[sys] || sys;
@@ -2491,11 +2491,17 @@
       }).then(function(r){ return r.json(); })
       .then(function(data){
         btn.disabled = false; btn.textContent = '進入系統';
-        if (data.ok) {
+        if (data.ok && data.accessKey) {
           sessionStorage.setItem(pendingSystem + '_auth', '1');
           if (data.accessKey) {
             if (pendingSystem === 'hr') { hrKey = data.accessKey; }
-            else { crmKey = data.accessKey; }
+            else {
+              crmKey = data.accessKey;
+              // 只保存後端簽發的限時憑證；舊版長效密鑰維持僅存記憶體。
+              if (data.sessionExpiresAt && crmKey.indexOf('crm1.') === 0) {
+                sessionStorage.setItem('crm_session_token', crmKey);
+              }
+            }
           }
           if (data.dbIds) {
             Object.keys(data.dbIds).forEach(function(k){ if (data.dbIds[k]) nDBs[k] = data.dbIds[k]; });
@@ -2503,6 +2509,7 @@
           }
           updateNotionUI();
           document.getElementById('login-overlay').classList.add('hidden');
+          document.getElementById('pw-input').value = '';
           enterSystem(pendingSystem);
         } else {
           document.getElementById('pw-err').textContent = '密碼錯誤，請再試一次';
@@ -2515,6 +2522,7 @@
       });
     }
     function enterSystem(sys) {
+      sessionStorage.setItem('activeSystem', sys);
       document.getElementById('system-select').classList.add('hidden');
       document.getElementById('nav-hr').style.display  = sys === 'hr'  ? '' : 'none';
       document.getElementById('nav-crm').style.display = sys === 'crm' ? '' : 'none';
@@ -2563,8 +2571,12 @@
     function goHome() {
       sessionStorage.removeItem('hr_auth');
       sessionStorage.removeItem('crm_auth');
+      sessionStorage.removeItem('crm_session_token');
+      sessionStorage.removeItem('activeSystem');
       hrKey  = '';
       crmKey = '';
+      CRM_DATA = []; _clientsCacheTs = 0;
+      _historyRevision++; _historyCache = {}; _historyRequests = {}; _expandedClients = {};
       document.getElementById('system-select').classList.remove('hidden');
       closeSidebar();
     }
@@ -2581,7 +2593,8 @@
 
     // ── State ──────────────────────────────────────────────
     var hrKey  = '';
-    var crmKey = '';
+    var crmKey = sessionStorage.getItem('crm_auth') === '1' ? (sessionStorage.getItem('crm_session_token') || '') : '';
+    if (crmKey.indexOf('crm1.') !== 0) crmKey = '';
     function hrH()  { return { 'Content-Type': 'application/json', 'X-Access-Key': hrKey };  }
     function crmH() { return { 'Content-Type': 'application/json', 'X-Access-Key': crmKey }; }
     var nDBs = JSON.parse(localStorage.getItem('nDBs') || 'null') || {};
@@ -3486,8 +3499,12 @@
   function loadClients(force) {
     if (force) { _historyRevision++; _historyCache = {}; _historyRequests = {}; }
     var el = document.getElementById('client-list');
-    if (!crmKey || !nDBs.crm) {
-        el.innerHTML = '<div class="empty">請先到「Notion 設定」填入 CRM 存取密鑰與 CRM 資料庫 ID 並儲存</div>';
+    if (!crmKey) {
+        requestCrmLogin();
+        return;
+    }
+    if (!nDBs.crm) {
+        el.innerHTML = '<div class="empty">登入服務未提供 CRM 資料庫設定，請重新登入；若仍出現此訊息，請聯繫系統管理員。<br><br><button class="btn" onclick="requestCrmLogin()">重新登入 CRM</button></div>';
         return;
     }
     // 快取未過期且有資料時直接渲染，不重新 fetch
@@ -3502,7 +3519,11 @@
         body: body
     })
       .then(function(r){ 
-          if(!r.ok) throw new Error('API Error ' + r.status);
+          if (r.status === 401) {
+            requestCrmLogin();
+            var authError = new Error('登入已失效'); authError.loginRequired = true; throw authError;
+          }
+          if(!r.ok) throw new Error('服務回應 ' + r.status);
           return r.json(); 
       })
       .then(function(data){
@@ -3534,8 +3555,21 @@
         renderClients();
       })
       .catch(function(err){ 
-          document.getElementById('client-list').innerHTML = '<div class="empty">連線失敗：' + err.message + '<br><br>請確認 Notion Token 與資料庫 ID 是否正確，且已在 Notion 中將資料庫「Connect to」此整合。</div>'; 
+          if (err.loginRequired) return;
+          document.getElementById('client-list').innerHTML = '<div class="empty">暫時無法載入 CRM，請稍後重試。<br><br><button class="btn" onclick="loadClients(true)">重新載入</button></div>';
       });
+  }
+
+  function requestCrmLogin() {
+    crmKey = '';
+    sessionStorage.removeItem('crm_auth');
+    sessionStorage.removeItem('crm_session_token');
+    CRM_DATA = []; _clientsCacheTs = 0;
+    _historyRevision++; _historyCache = {}; _historyRequests = {}; _expandedClients = {};
+    ['d-total', 'd-hot', 'd-signed', 'd-amount'].forEach(function(id) { document.getElementById(id).textContent = '—'; });
+    document.getElementById('client-list').innerHTML = '<div class="empty">請登入後查看客戶資料。</div>';
+    selectSystem('crm');
+    document.getElementById('pw-err').textContent = '登入已失效，請重新登入 CRM。';
   }
 
 
@@ -4685,6 +4719,8 @@
     }).catch(function () { });
     updateNotionUI();
     document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+    // 同一分頁重整時恢復 CRM；只保存本次登入憑證，不保存密碼。
+    if (sessionStorage.getItem('activeSystem') === 'crm') selectSystem('crm');
     // Deploy Trigger: 2026-05-12
   </script>
 </body>
