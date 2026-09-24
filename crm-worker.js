@@ -1,16 +1,11 @@
 /**
- * CRM 系統 API 代理 - Cloudflare Worker（v6・2026-09-23）
- * v6：瀏覽器改用 8 小時簽章憑證；長效密鑰僅供既有服務互連。
- *
- * v5 變更（相對 v4）：
- *   - /api/crm/talks 改為連同每位客戶「頁面內文的歷史日誌」一起回傳（log 陣列）
- *     ＝時間軸展開卡直接顯示歷史日誌，不再依賴已刪除的「詳細現況備註」欄位
- *   - note 欄位改回傳日誌最新一條（相容舊前端）
- *   - CRM 主表欄位現況（2026-07-17）：客戶名稱／下一步行動／最近聯繫日期／優先級（裝狀態）／專案金額／承諾事項
+ * CRM 系統 API 代理 - Cloudflare Worker（v6・2026-09-24）
+ * 瀏覽器使用 8 小時簽章憑證；長效密鑰僅供既有服務互連。
+ * 已退役的獨立時間軸資料接口不再提供。
  *
  * 環境變數（Settings → Variables）：
  *   CRM_TOKEN         Notion Integration Token
- *   CRM_ACCESS_KEY    前端呼叫 /api/crm/* 時需攜帶的密鑰
+ *   CRM_ACCESS_KEY    既有服務互連密鑰，也用來簽署瀏覽器短期憑證
  *   CRM_PASSWORD      CRM 登入密碼
  *   ADMIN_PASSWORD    管理員設定頁密碼
  *   GEMINI_API_KEY    Google AI Studio API Key
@@ -226,64 +221,6 @@ async function handleLineCRMQuery(request, env, origin) {
   }
 }
 
-// ── 客戶頁面內文：抓「歷史日誌」───────────────────────────────
-
-async function fetchClientLog(env, pageId) {
-  try {
-    const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`, {
-      headers: { 'Authorization': 'Bearer ' + env.CRM_TOKEN, 'Notion-Version': '2022-06-28' },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.results || [])
-      .map(b => {
-        const seg = (b.paragraph || b.heading_1 || b.heading_2 || b.heading_3 || b.bulleted_list_item || {}).rich_text || [];
-        return seg.map(t => t.plain_text || '').join('').trim();
-      })
-      .filter(line => line && !line.includes('歷史日誌'));
-  } catch (e) {
-    return [];
-  }
-}
-
-// ── 時間軸洽談中資料（供 HR Worker 轉發呼叫）────────────────
-
-async function handleTalksData(request, env, origin) {
-  if (!authCheck(request, env.CRM_ACCESS_KEY)) return errResponse('Unauthorized', origin, 401);
-  if (!env.CRM_TOKEN || !env.DB_CRM) return errResponse('CRM not configured', origin, 500);
-  try {
-    const clients = await crmNotionQuery(env, null, [{ property: '優先級', direction: 'descending' }]);
-    if (!clients) return errResponse('CRM query failed', origin, 500);
-    const txt = arr => (arr || []).map(t => t.plain_text || '').join('');
-
-    // v5：逐頁抓歷史日誌（每批 3 頁，避免撞 Notion 速率限制）
-    const logs = [];
-    for (let i = 0; i < clients.length; i += 3) {
-      const chunk = clients.slice(i, i + 3);
-      const results = await Promise.all(chunk.map(p => fetchClientLog(env, p.id)));
-      logs.push(...results);
-    }
-
-    const talks = clients.map((p, idx) => {
-      const pr = p.properties || {};
-      return {
-        name: txt(pr['客戶名稱']?.title),
-        status: pr['優先級']?.select?.name || '',
-        priority: pr['優先級']?.select?.name || '',
-        last: pr['最近聯繫日期']?.date?.start || '',
-        next: '',
-        action: txt(pr['下一步行動']?.rich_text),
-        log: logs[idx] || [],
-        note: (logs[idx] && logs[idx][0]) || '',
-        promise: txt(pr['承諾事項']?.rich_text),
-      };
-    });
-    return okResponse({ talks }, origin);
-  } catch (e) {
-    return errResponse('talks error: ' + e.message, origin, 500);
-  }
-}
-
 // ── LINE Webhook ──────────────────────────────────────────────
 
 async function handleLineWebhook(request) {
@@ -321,7 +258,7 @@ export default {
 
     if (pathname === '/api/auth')              return handleAuth(request, env, origin);
     if (pathname === '/api/crm/line-query')    return handleLineCRMQuery(request, env, origin);
-    if (pathname === '/api/crm/talks')         return handleTalksData(request, env, origin);
+    if (pathname === '/api/crm/talks')         return errResponse('Route not found', origin, 404);
     if (pathname.startsWith('/api/crm/'))      return handleCRM(request, env, pathname, origin);
     if (pathname === '/api/gemini')            return handleGemini(request, env, origin);
     if (pathname === '/api/line/webhook')      return handleLineWebhook(request);

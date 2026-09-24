@@ -38,7 +38,8 @@ const call = (path,key,body,settings=env) => context.worker.fetch(request(path,k
   assert.equal(upstreamCalls.length,before,'Rejected tokens must not reach Notion');
   assert.equal((await call('/api/crm/line-query',env.CRM_ACCESS_KEY,{command:'客戶總覽'})).status,200);
   assert.equal((await call('/api/crm/line-query',session.accessKey,{command:'客戶總覽'})).status,401);
+  assert.equal((await call('/api/crm/talks',env.CRM_ACCESS_KEY)).status,404,'Retired timeline endpoint must be absent');
   const admin=await (await call('/api/auth',null,{system:'admin',password:env.ADMIN_PASSWORD})).json();
   assert.equal(admin.ok,true);assert.equal(admin.accessKey,null);
-  console.log('PASS: login, 8-hour expiry, tampering, scope, password rotation, no-store, Notion query/history/write proxy, LINE service key, admin');
+  console.log('PASS: login, 8-hour expiry, tampering, scope, password rotation, no-store, Notion query/history/write proxy, LINE service key, retired timeline endpoint, admin');
 })().catch(e=>{console.error(e);process.exitCode=1;});
