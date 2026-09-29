@@ -3945,7 +3945,7 @@
         '<summary class="client-row">' +
           '<div class="client-info">' +
             '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
-            '<div class="client-meta">' + esc(c.action || '尚無下一步') + '</div>' +
+            '<div class="client-meta">' + esc((c.action || '尚無下一步').replace(/<br\s*\/?>/gi, '\n')) + '</div>' +
             '<div class="client-dates">最近聯繫：' + esc(c.lastdate || '未填寫') + (c.nextdate ? ' · 下次跟進：' + esc(c.nextdate) : '') + '</div>' +
           '</div>' +
           '<div class="client-tags">' +
