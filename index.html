@@ -1352,7 +1352,10 @@
     #page-crm-dashboard .client-row { align-items: flex-start; padding: 22px 0; gap: 20px; }
     #page-crm-dashboard .client-row:hover { padding: 22px 24px; }
     #page-crm-dashboard .client-name { font-size: 20px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
-    #page-crm-dashboard .client-meta { font-size: 18px; color: var(--text); line-height: 1.8; margin-top: 8px; max-width: 65ch; overflow-wrap: anywhere; white-space: pre-line; }
+    #page-crm-dashboard .client-meta { font-size: 18px; color: var(--text); line-height: 1.8; margin-top: 8px; overflow-wrap: anywhere; }
+    #page-crm-dashboard .client-meta-line { padding: 8px 14px; border-left: 3px solid var(--border); background: var(--surface); }
+    #page-crm-dashboard .client-meta-line:nth-child(odd) { background: var(--bg); }
+    #page-crm-dashboard .client-meta-line + .client-meta-line { margin-top: 2px; }
     #page-crm-dashboard .client-dates { font-size: 14px; color: var(--text2); line-height: 1.6; margin-top: 8px; }
     #page-crm-dashboard .client-tags { max-width: 180px; padding-top: 4px; }
     #page-crm-dashboard .tag { font-size: 14px; line-height: 1.5; white-space: normal; }
@@ -3930,6 +3933,14 @@
     });
   }
 
+  function actionLines(action) {
+    return String(action || '尚無下一步').replace(/<br\s*\/?>/gi, '\n').split(/\n+/)
+      .map(function(line){ return line.replace(/^\s*[•・]\s*/, '').trim(); })
+      .filter(Boolean)
+      .map(function(line){ return '<div class="client-meta-line">' + esc(line) + '</div>'; })
+      .join('');
+  }
+
   function renderClients() {
     var el = document.getElementById('client-list');
     if (!CRM_DATA.length) { el.innerHTML = '<div class="empty">沒有客戶資料</div>'; return; }
@@ -3945,7 +3956,7 @@
         '<summary class="client-row">' +
           '<div class="client-info">' +
             '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
-            '<div class="client-meta">' + esc((c.action || '尚無下一步').replace(/<br\s*\/?>/gi, '\n')) + '</div>' +
+            '<div class="client-meta">' + actionLines(c.action) + '</div>' +
             '<div class="client-dates">最近聯繫：' + esc(c.lastdate || '未填寫') + (c.nextdate ? ' · 下次跟進：' + esc(c.nextdate) : '') + '</div>' +
           '</div>' +
           '<div class="client-tags">' +
