@@ -2126,11 +2126,11 @@
         <div class="ph"><h2>客戶列表</h2><p>查看客戶近況與歷史日誌</p></div>
         <div class="card" style="padding:0 24px">
           <div class="crm-list-toolbar">
-            <span class="ct">最近聯繫</span>
+            <span class="ct">最近更新</span>
             <span class="crm-expand-hint">點選客戶可展開歷史日誌</span>
             <button class="btn btnsm" onclick="loadClients(true)">↻ 重新整理</button>
           </div>
-          <p class="crm-order-note">依最近聯繫日期由新到舊排列；未填日期置後。</p>
+          <p class="crm-order-note">依資料更新日期由新到舊排列；未填日期置後。</p>
           <div id="client-list"><div class="empty">載入中...</div></div>
         </div>
       </div>
@@ -2192,7 +2192,6 @@
                 <option>LINE</option><option>Email</option>
               </select>
             </div>
-            <div class="fg"><label>最近聯繫日期</label><input type="date" id="add-lastdate"></div>
             <div class="fg"><label>下次跟進日期</label><input type="date" id="add-nextdate"></div>
           </div>
           <div class="grid1">
@@ -2275,7 +2274,6 @@
                   <option>LINE</option><option>Email</option>
                 </select>
               </div>
-              <div class="fg"><label>最近聯繫日期</label><input type="date" id="update-lastdate"></div>
               <div class="fg"><label>下次跟進日期</label><input type="date" id="update-nextdate"></div>
               <div class="fg"><label>專案金額（NT$）</label><input type="number" id="update-amount"></div>
             </div>
@@ -3481,6 +3479,14 @@
   var _historyRequests = {};
   var _historyRevision = 0;
 
+  function crmUpdateDate(value) {
+    var date = new Date(value);
+    if (!value || !Number.isFinite(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(date);
+  }
+
   function loadClients(force) {
     if (force) { _historyRevision++; _historyCache = {}; _historyRequests = {}; }
     var el = document.getElementById('client-list');
@@ -3523,7 +3529,7 @@
             priority: gp(pr,'優先級','select'),
             reaction: gp(pr,'客戶反應','select'),
             contact: gp(pr,'聯繫方式','select'),
-            lastdate: gp(pr,'最近聯繫日期','date'),
+            lastdate: crmUpdateDate(p.last_edited_time),
             nextdate: gp(pr,'下次跟進日期','date'),
             action: gp(pr,'下一步行動','text'),
             commitment: gp(pr,'承諾事項','text'),
@@ -3957,7 +3963,7 @@
           '<div class="client-info">' +
             '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
             '<div class="client-meta">' + actionLines(c.action) + '</div>' +
-            '<div class="client-dates">最近聯繫：' + esc(c.lastdate || '未填寫') + (c.nextdate ? ' · 下次跟進：' + esc(c.nextdate) : '') + '</div>' +
+            '<div class="client-dates">資料更新日期：' + esc(c.lastdate || '未填寫') + '</div>' +
           '</div>' +
           '<div class="client-tags">' +
             (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + esc(c.status) + '</span>' : '') +
@@ -4227,7 +4233,6 @@
     setVal('update-priority', c.priority);
     setVal('update-reaction', c.reaction);
     setVal('update-contact', c.contact);
-    document.getElementById('update-lastdate').value = c.lastdate || '';
     document.getElementById('update-nextdate').value = c.nextdate || '';
     document.getElementById('update-amount').value = c.amount || '';
     document.getElementById('update-action').value = c.action || '';
@@ -4307,7 +4312,7 @@
     '- priority: 優先級（只能是：本週完成/本週推進/跟進中/持續維護/進行中，若無法判斷則 null）\n' +
     '- reaction: 客戶反應（只能是：正面/猶豫/有疑慮，若無法判斷則 null）\n' +
     '- contactMethod: 聯繫方式（只能是：電話/視訊/見面/LINE/Email，若無法判斷則 null）\n' +
-    '- lastContactDate: 最近聯繫日期（YYYY-MM-DD，今天是 ' + new Date().toISOString().split('T')[0] + '，若無法判斷則 null）\n' +
+    '- lastContactDate: 客戶事件日期，僅供內文參考，不填入資料更新日期（YYYY-MM-DD，今天是 ' + new Date().toISOString().split('T')[0] + '，若無法判斷則 null）\n' +
     '- nextFollowDate: 下次跟進日期（YYYY-MM-DD，若無法判斷則 null）\n' +
     '- nextAction: 下一步行動（一句話，若無則 null）\n' +
     '- commitment: 承諾事項（一句話，若無則 null）\n' +
@@ -4369,7 +4374,6 @@
     if (result.priority) setVal(prefix + '-priority', result.priority);
     if (result.reaction) setVal(prefix + '-reaction', result.reaction);
     if (result.contactMethod) setVal(prefix + '-contact', result.contactMethod);
-    if (result.lastContactDate) document.getElementById(prefix + '-lastdate').value = result.lastContactDate;
     if (result.nextFollowDate) document.getElementById(prefix + '-nextdate').value = result.nextFollowDate;
     if (result.nextAction) document.getElementById(prefix + '-action').value = result.nextAction;
     if (result.commitment) document.getElementById(prefix + '-commitment').value = result.commitment;
@@ -4436,7 +4440,6 @@
     var priority = document.getElementById(prefix + '-priority').value;
     var reaction = document.getElementById(prefix + '-reaction').value;
     var contact = document.getElementById(prefix + '-contact').value;
-    var lastdate = document.getElementById(prefix + '-lastdate').value;
     var nextdate = document.getElementById(prefix + '-nextdate').value;
     var action = document.getElementById(prefix + '-action').value;
     var commitment = document.getElementById(prefix + '-commitment').value;
@@ -4446,7 +4449,6 @@
     if (priority) props['優先級'] = { select: { name: priority } };
     if (reaction) props['客戶反應'] = { select: { name: reaction } };
     if (contact) props['聯繫方式'] = { select: { name: contact } };
-    if (lastdate) props['最近聯繫日期'] = { date: { start: lastdate } };
     if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
     if (action) props['下一步行動'] = { rich_text: rt(action) };
     if (commitment) props['承諾事項'] = { rich_text: rt(commitment) };
@@ -4473,7 +4475,6 @@
 
   function updateClientFromCall(clientId, d) {
     var props = {};
-    if (d.lastdate) props['最近聯繫日期'] = { date: { start: d.lastdate } };
     if (d.contact) props['聯繫方式'] = { select: { name: d.contact } };
     if (d.reaction) props['客戶反應'] = { select: { name: d.reaction } };
     if (d.commitment) props['承諾事項'] = { rich_text: rt(d.commitment) };
@@ -4499,7 +4500,7 @@
     '- priority: 優先級（只能是：本週完成/本週推進/跟進中/持續維護/進行中，若無法判斷則 null）\n' +
     '- reaction: 客戶反應（只能是：正面/猶豫/有疑慮，若無法判斷則 null）\n' +
     '- contactMethod: 聯繫方式（只能是：電話/視訊/見面/LINE/Email，若無法判斷則 null）\n' +
-    '- lastContactDate: 最近聯繫日期（YYYY-MM-DD，今天是 ' + new Date().toISOString().split('T')[0] + '，若無法判斷則 null）\n' +
+    '- lastContactDate: 客戶事件日期，僅供內文參考，不填入資料更新日期（YYYY-MM-DD，今天是 ' + new Date().toISOString().split('T')[0] + '，若無法判斷則 null）\n' +
     '- nextFollowDate: 下次跟進日期（YYYY-MM-DD，若無法判斷則 null）\n' +
     '- nextAction: 下一步行動（一句話，若無則 null）\n' +
     '- commitment: 承諾事項（一句話，若無則 null）\n' +
@@ -4626,7 +4627,6 @@
       if (d.priority) props['優先級'] = { select: { name: d.priority } };
       if (d.reaction) props['客戶反應'] = { select: { name: d.reaction } };
       if (d.contactMethod) props['聯繫方式'] = { select: { name: d.contactMethod } };
-      if (d.lastContactDate) props['最近聯繫日期'] = { date: { start: d.lastContactDate } };
       if (nextdate) { props['下次跟進日期'] = { date: { start: nextdate } }; props['下次跟進提醒日'] = { date: { start: nextdate } }; }
       if (action) props['下一步行動'] = { rich_text: rt(action) };
       if (commit) props['承諾事項'] = { rich_text: rt(commit) };
@@ -4697,3 +4697,4 @@
 </body>
 
 </html>
+

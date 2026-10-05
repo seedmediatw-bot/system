@@ -207,8 +207,8 @@ async function handleLineCRMQuery(request, env, origin) {
       const status = pr['優先級']?.select?.name || '—';
       const nextAction = pr['下一步行動']?.rich_text?.[0]?.plain_text || '—';
       const amount = pr['專案金額']?.number ? `NT$${pr['專案金額'].number.toLocaleString()}` : '—';
-      const last = pr['最近聯繫日期']?.date?.start || '—';
-      return okResponse({ message: `👤 ${name}\n\n狀態：${status}\n最近聯繫：${last}\n下一步：${nextAction}\n金額：${amount}` }, origin);
+      const last = clients[0].last_edited_time ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(clients[0].last_edited_time)) : '—';
+      return okResponse({ message: `👤 ${name}\n\n狀態：${status}\n資料更新日期：${last}\n下一步：${nextAction}\n金額：${amount}` }, origin);
     }
 
     if (command === '跟進提醒') {
@@ -270,3 +270,4 @@ export default {
     ctx.waitUntil(handleWeeklyCRM(env));
   },
 };
+
