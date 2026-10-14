@@ -3531,7 +3531,7 @@
             contact: gp(pr,'聯繫方式','select'),
             lastdate: crmUpdateDate(p.last_edited_time),
             nextdate: gp(pr,'下次跟進日期','date'),
-            action: gp(pr,'下一步行動','text'),
+            action: ((pr['下一步行動'] && pr['下一步行動'].rich_text) || []).map(function(t){ return t.plain_text || (t.text && t.text.content) || ''; }).join(''),
             commitment: gp(pr,'承諾事項','text'),
             notes: gp(pr,'詳細現況備註','text'),
             amount: pr['專案金額'] && pr['專案金額'].number ? pr['專案金額'].number : 0
