@@ -1349,81 +1349,75 @@
     [id^="page-crm-"] select,
     [id^="page-crm-"] textarea,
     [id^="page-crm-"] .btn { font-size: 16px; }
-    #page-crm-dashboard .client-row { align-items: flex-start; padding: 22px 0; gap: 20px; }
-    #page-crm-dashboard .client-row:hover { padding: 22px 24px; }
-    #page-crm-dashboard .client-name { font-size: 26px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
-    #page-crm-dashboard .client-meta { font-size: 20px; color: var(--text); line-height: 1.8; margin-top: 8px; overflow-wrap: anywhere; }
-    #page-crm-dashboard .client-meta-line { padding: 8px 14px; border-left: 3px solid var(--border); background: var(--surface); }
-    #page-crm-dashboard .client-meta-line:nth-child(odd) { background: var(--bg); }
-    #page-crm-dashboard .client-meta-line + .client-meta-line { margin-top: 2px; }
-    #page-crm-dashboard .client-dates { font-size: 15px; color: var(--text2); line-height: 1.6; margin-top: 8px; }
-    #page-crm-dashboard .client-tags { max-width: 180px; padding-top: 4px; }
-    /* CRM 固定寫法：膠囊標題（右端 three.js 流動光澤，參考 A34）＋有框線的對齊表格 */
-    #page-crm-dashboard .client-card > summary { flex-wrap: wrap; }
-    #page-crm-dashboard .crm-plan-row { flex: 0 0 100%; width: 100%; min-width: 0; }
-    #page-crm-dashboard .crm-plan { margin-top: 0; max-width: 1100px; }
-    #page-crm-dashboard .crm-cap { position: relative; min-height: 80px; border-radius: 40px; overflow: hidden; display: flex; align-items: center; padding: 10px 28px; margin: 0 0 10px; box-shadow: 0 8px 20px rgba(40, 30, 60, .10); }
-    #page-crm-dashboard .crm-cap canvas { position: absolute; top: -14px; left: -14px; width: calc(100% + 28px); height: calc(100% + 28px); display: block; filter: blur(2px); }
-    #page-crm-dashboard .crm-cap-tx { position: relative; z-index: 1; max-width: 64%; }
-    #page-crm-dashboard .crm-cap-t1 { font-size: 23px; font-weight: 700; line-height: 1.35; }
-    #page-crm-dashboard .crm-cap-t2 { font-size: 16px; font-weight: 400; line-height: 1.5; margin-top: 2px; }
-    #page-crm-dashboard .crm-cap[data-sheen="dark"] .crm-cap-t2 { font-size: 20px; font-weight: 500; line-height: 1.55; margin-top: 4px; }
-    #page-crm-dashboard .crm-tb { display: grid; grid-template-columns: 5.2em minmax(0, 1fr); background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; margin: 0 6px 18px; font-size: 21px; line-height: 1.7; color: var(--text); }
-    #page-crm-dashboard .crm-tb > div { padding: 8px 14px; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
-    #page-crm-dashboard .crm-tb > div:nth-child(-n+2) { border-top: 0; }
-    #page-crm-dashboard .crm-tb > .k { border-right: 1px solid var(--border); font-size: 20px; font-weight: 700; }
-    #page-crm-dashboard .crm-tb.quiet { color: #4f4b43; font-size: 19px; }
-    #page-crm-dashboard .crm-tb.quiet > .k { font-size: 19px; font-weight: 600; }
-    #page-crm-dashboard .crm-tb.stack { grid-template-columns: minmax(0, 1fr); }
-    #page-crm-dashboard .crm-tb.stack > div:nth-child(2) { border-top: 1px solid var(--border); }
-    #page-crm-dashboard .crm-tb.stack { font-size: 18px; color: #5c574e; }
-    #page-crm-dashboard .crm-tb.stack b { display: block; font-weight: 600; color: #3d3a34; }
-    @media (max-width: 640px) {
-      #page-crm-dashboard .crm-plan { margin-right: -30px; }
-      #page-crm-dashboard .crm-cap { border-radius: 24px; padding: 10px 18px; }
-      #page-crm-dashboard .crm-cap-tx { max-width: 72%; }
-      #page-crm-dashboard .client-name { font-size: 22px; }
-      #page-crm-dashboard .crm-cap-t1 { font-size: 20px; }
-      #page-crm-dashboard .crm-cap[data-sheen="dark"] .crm-cap-t2 { font-size: 17px; }
-      #page-crm-dashboard .crm-tb { grid-template-columns: 4.2em minmax(0, 1fr); font-size: 18px; margin: 0 0 14px; }
-      #page-crm-dashboard .crm-tb > .k { font-size: 17px; }
-      #page-crm-dashboard .crm-tb.quiet, #page-crm-dashboard .crm-tb.quiet > .k { font-size: 17px; }
-      #page-crm-dashboard .crm-tb.stack { font-size: 16px; }
-      #page-crm-dashboard .crm-tb > div { padding: 7px 10px; }
-    }
-    #page-crm-dashboard .tag { font-size: 14px; line-height: 1.5; white-space: normal; }
-    #page-crm-dashboard .tag small { font-size: inherit; }
-    #page-crm-dashboard .client-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    /* CRM 客戶列表：一列一客戶，欄位對齊核對「現況、下一步、待確認事項」；三層字級：客戶名、主題、敘述；不用裝飾色、膠囊或動態 */
     .crm-list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0 8px; }
-    .crm-list-toolbar .ct { margin: 0 auto 0 0; font-size: 20px; }
-    .crm-expand-hint { font-size: 14px; color: var(--text2); }
-    .crm-order-note { font-size: 14px; line-height: 1.6; color: var(--text2); margin: 4px 0 12px; }
-    #page-crm-dashboard .client-card { border-bottom: 1px solid var(--border); }
-    #page-crm-dashboard .client-card:last-child { border-bottom: 0; }
-    #page-crm-dashboard .client-card > summary { list-style: none; border: 0; position: relative; padding-right: 36px; }
+    .crm-list-toolbar .ct { margin: 0 auto 0 0; font-size: 22px; font-weight: 700; }
+    .crm-expand-hint { font-size: 16px; color: var(--text2); }
+    .crm-order-note { font-size: 16px; line-height: 1.6; color: var(--text2); margin: 4px 0 12px; }
+    #page-crm-dashboard .crm-grid { display: grid; grid-template-columns: minmax(9em, 14em) minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; row-gap: 16px; }
+    #page-crm-dashboard #client-list > .client-card:first-child { border-top: 1px solid var(--border2); }
+    #page-crm-dashboard .client-card { border-bottom: 1px solid var(--border2); }
+    #page-crm-dashboard .client-card > summary { list-style: none; position: relative; cursor: pointer; padding: 22px 36px 22px 0; }
     #page-crm-dashboard .client-card > summary::-webkit-details-marker { display: none; }
-    #page-crm-dashboard .client-card > summary:hover { margin: 0; padding-left: 0; padding-right: 36px; }
-    #page-crm-dashboard .client-chevron { position: absolute; right: 4px; top: 28px; width: 20px; height: 20px; color: var(--text2); transition: transform .15s; }
+    #page-crm-dashboard .client-card > summary:hover { background: var(--bg); }
+    #page-crm-dashboard .client-card > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    #page-crm-dashboard .client-name { font-size: 24px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+    #page-crm-dashboard .crm-sub { font-size: 16px; line-height: 1.6; color: var(--text2); margin-top: 6px; }
+    #page-crm-dashboard .crm-grid > :first-child { grid-row: span 2; }
+    #page-crm-dashboard .crm-grid:has(.crm-others) > :first-child { grid-row: span 3; }
+    #page-crm-dashboard .crm-grid.crm-old > :first-child { grid-row: auto; }
+    #page-crm-dashboard .crm-c-now { grid-column: 2 / -1; }
+    #page-crm-dashboard .crm-lab { display: block; font-size: 15px; font-weight: 700; color: var(--text2); margin-bottom: 4px; }
+    #page-crm-dashboard .crm-now { font-size: 19px; font-weight: 500; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; }
+    #page-crm-dashboard .crm-now p { margin: 0; }
+    #page-crm-dashboard .crm-now p + p { margin-top: 8px; }
+    #page-crm-dashboard .crm-items { list-style: none; margin: 0; padding: 0; font-size: 18px; line-height: 1.6; color: var(--text); border: 1px solid var(--border2); background: var(--surface); }
+    #page-crm-dashboard .crm-items li { display: grid; grid-template-columns: 4.4em minmax(0, 1fr); overflow-wrap: anywhere; }
+    #page-crm-dashboard .crm-items li + li { border-top: 1px solid var(--border2); }
+    #page-crm-dashboard .crm-items li > * { padding: 8px 12px; }
+    #page-crm-dashboard .crm-items li > b { border-right: 1px solid var(--border2); padding-right: 8px; }
+    #page-crm-dashboard .crm-items li.nok { grid-template-columns: minmax(0, 1fr); }
+    #page-crm-dashboard .crm-items b { font-weight: 700; }
+    #page-crm-dashboard .crm-none { font-size: 18px; color: var(--text2); }
+    #page-crm-dashboard .crm-others { grid-column: 2 / -1; }
+    #page-crm-dashboard .crm-lab2 { font-size: 15px; font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+    #page-crm-dashboard .client-chevron { position: absolute; right: 6px; top: 28px; width: 22px; height: 22px; color: var(--text2); transition: transform .15s; }
     #page-crm-dashboard .client-card[open] .client-chevron { transform: rotate(90deg); }
-    #page-crm-dashboard .client-card[open] > summary { padding-bottom: 16px; }
-    #page-crm-dashboard .client-detail { background: var(--bg); padding: 20px 24px; margin-bottom: 20px; border-radius: 8px; }
-    .client-detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-    .client-detail-head h3 { font-size: 18px; font-weight: 600; margin: 0; }
-    .client-detail-head a { font-size: 14px; line-height: 1.6; color: var(--accent); text-underline-offset: 3px; }
-    .client-extra { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--text2); }
-    #page-crm-dashboard .tl-date { font-size: 14px; line-height: 1.6; color: var(--text2); }
-    #page-crm-dashboard .tl-content { font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-line; }
-    #page-crm-dashboard .timeline-item { padding-bottom: 24px; }
-    #page-crm-dashboard .client-detail .empty { font-size: 16px; padding: 12px 0; text-align: left; }
+    #page-crm-dashboard .client-detail { background: var(--bg); padding: 20px 24px 24px; margin-bottom: 18px; }
+    #page-crm-dashboard .client-detail h4 { font-size: 19px; font-weight: 700; margin: 0 0 10px; }
+    #page-crm-dashboard .crm-sec + .crm-sec { margin-top: 22px; }
+    .client-detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+    .client-detail-head h4 { margin: 0 !important; }
+    .client-detail-head a { font-size: 16px; line-height: 1.6; color: var(--accent); text-underline-offset: 3px; }
+    .client-extra { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 17px; line-height: 1.6; }
+    #page-crm-dashboard .crm-day { padding: 6px 0 16px; max-width: 64em; }
+    #page-crm-dashboard .crm-day-date { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    #page-crm-dashboard .crm-stack { border: 1px solid var(--border2); background: var(--surface); max-width: 64em; font-size: 17px; line-height: 1.7; color: var(--text); overflow-wrap: anywhere; }
+    #page-crm-dashboard .crm-stack > div { padding: 10px 16px; }
+    #page-crm-dashboard .crm-stack > div + div { border-top: 1px solid var(--border); }
+    #page-crm-dashboard .crm-stack b { display: block; font-weight: 700; }
+    #page-crm-dashboard .crm-stack p { margin: 2px 0 0; }
+    #page-crm-dashboard .crm-src { font-size: 15px; color: var(--text2); margin-top: 2px; }
+    #page-crm-dashboard .crm-src a { color: var(--accent); }
+    #page-crm-dashboard .client-detail .empty { font-size: 17px; padding: 12px 0; text-align: left; }
     @media (prefers-reduced-motion: reduce) { #page-crm-dashboard .client-chevron { transition: none; } }
+    @media (max-width: 1100px) {
+      #page-crm-dashboard .crm-grid { grid-template-columns: minmax(0, 1fr); row-gap: 14px; }
+      #page-crm-dashboard .crm-grid > :first-child { grid-row: auto !important; }
+      #page-crm-dashboard .crm-c-now { grid-column: auto; }
+      #page-crm-dashboard .crm-others { grid-column: auto; margin-top: 0; }
+    }
     @media (max-width: 720px) {
-      #page-crm-dashboard .client-row { flex-direction: column; gap: 10px; }
-      #page-crm-dashboard .crm-plan-row { flex: 0 0 auto; }
-      #page-crm-dashboard .client-tags { max-width: none; justify-content: flex-start; padding: 0; }
       .crm-list-toolbar { gap: 12px 8px; }
       .crm-list-toolbar .ct { flex-basis: 100%; }
-      #page-crm-dashboard .client-detail { padding: 18px 14px; }
-      #page-crm-dashboard .client-card > summary .client-tags { padding-right: 0; }
+      #page-crm-dashboard .client-card > summary { padding: 18px 30px 18px 0; }
+      #page-crm-dashboard .client-name { font-size: 22px; }
+      #page-crm-dashboard .crm-now { font-size: 18px; }
+      #page-crm-dashboard .crm-items { font-size: 17px; }
+      #page-crm-dashboard .crm-items li { grid-template-columns: 3.9em minmax(0, 1fr); }
+      #page-crm-dashboard .crm-items li > * { padding: 7px 10px; }
+      #page-crm-dashboard .client-detail { padding: 16px 14px 20px; }
+      #page-crm-dashboard .crm-stack > div { padding: 10px 12px; }
     }
   </style>
 </head>
@@ -3955,8 +3949,6 @@
   }
   // ── Interview END ──────────────────────────────────────────
 
-  var STATUS_COLOR = { '已簽約':'tgreen','製作中':'tgreen','快要簽約':'tyellow','有意願待簽約':'tyellow','MOU 待簽':'tyellow','報價中':'tblue','已報價':'tblue','跟進中':'tgray','暫緩':'tred','戰略夥伴':'tblue' };
-  var PRIORITY_COLOR = { '本週完成':'tred','本週推進':'tyellow','跟進中':'tgray','持續維護':'tgray','進行中':'tgreen' };
 
   function sortedClients(clients) {
     function dateValue(c) {
@@ -3973,195 +3965,94 @@
     });
   }
 
-  function actionLines(action) {
-    return String(action || '尚無下一步').replace(/<br\s*\/?>/gi, '\n').split(/\n+/)
-      .map(function(line){ return line.replace(/^\s*[•・]\s*/, '').trim(); })
-      .filter(Boolean)
-      .map(function(line){ return '<div class="client-meta-line">' + esc(line) + '</div>'; })
-      .join('');
+  // ---- CRM 固定寫法：最新近況｜MM/DD、• 現況、• 下一步（- 主題：內容）、• 待確認事項、其他 • 標籤：內容 ----
+  function splitTopic(t) {
+    var i = t.search(/[：:]/);
+    return i > 0 && i <= 8 ? { k: t.slice(0, i).trim(), v: t.slice(i + 1).trim() } : { k: '', v: t.trim() };
   }
-
-  // ---- CRM 固定寫法的呈現：最新近況｜MM/DD、• 現況、• 下一步（- 主題：內容）、• 待確認事項、其他 • 標籤：內容 ----
-  var CRM_TINTS = [
-    [/星展|環星匯|DBS/i, '#63418a', ['#9b72d6', '#d9c6f2', '#f2c6e0', '#efe7fb']],
-    [/中華日報|華傳媒/, '#963f3b', ['#e07a6c', '#f6c5b8', '#f3d9a6', '#fbe9e4']],
-    [/錢慶文/, '#276a70', ['#4fa8a8', '#bfe3df', '#d8efc9', '#e8f6f4']],
-    [/富貴/, '#36558b', ['#5d82c9', '#c6d6f3', '#e6d9b8', '#eef3fc']],
-    [/德育/, '#416d3a', ['#6fa565', '#cfe4c8', '#efe2b0', '#eef6ec']]
-  ];
-  var CRM_TINT_DEFAULT = ['#5a564c', ['#b8a58e', '#e6dccd', '#d4c9bd', '#f5f0e8']];
-  var CRM_SAND = ['#d8b896', '#efdcc6', '#c9b6a6', '#f7efe6'];
-  function crmTint(name) {
-    var hit = CRM_TINTS.filter(function(t){ return t[0].test(name || ''); })[0];
-    return hit ? { fg: hit[1], sheen: hit[2] } : { fg: CRM_TINT_DEFAULT[0], sheen: CRM_TINT_DEFAULT[1] };
+  function planLines(action) {
+    return String(action || '').replace(/<br\s*\/?>/gi, '\n').split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
   }
   function parsePlan(action) {
-    var lines = String(action || '').replace(/<br\s*\/?>/gi, '\n').split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
-    if (!lines.some(function(l){ return /^[•・]?\s*下一步[：:]\s*$/.test(l); }) || !lines.some(function(l){ return /^-\s*/.test(l); })) return null;
-    var plan = { date: '', blocks: [] }, cur = null;
+    var lines = planLines(action);
+    if (!lines.some(function(l){ return /^[•・]?\s*(現況|下一步)[：:]/.test(l); })) return null;
+    var plan = { date: '', now: '', next: [], pending: [], others: [], loose: [] }, cur = null;
     lines.forEach(function(l){
       var m = l.match(/^最新近況\s*[｜|]\s*(.+)$/);
       if (m) { plan.date = m[1]; return; }
       if (/^-\s*/.test(l)) {
-        if (!cur) return;
-        var t = l.replace(/^-\s*/, ''), i = t.search(/[：:]/);
-        cur.items.push(i > 0 && i <= 8 ? { k: t.slice(0, i), v: t.slice(i + 1).trim() } : { k: '', v: t });
+        var item = splitTopic(l.replace(/^-\s*/, ''));
+        if (cur === 'next' || cur === 'pending') plan[cur].push(item); else plan.loose.push(item.k ? item.k + '：' + item.v : item.v);
         return;
       }
-      var b = l.replace(/^[•・]\s*/, ''), j = b.search(/[：:]/);
-      cur = { label: j > 0 ? b.slice(0, j) : b, text: j > 0 ? b.slice(j + 1).trim() : '', items: [] };
-      plan.blocks.push(cur);
+      var bullet = /^[•・]/.test(l), b = l.replace(/^[•・]\s*/, ''), j = b.search(/[：:]/);
+      var label = j > 0 && j <= 20 ? b.slice(0, j).trim() : '', text = label ? b.slice(j + 1).trim() : b;
+      if (label === '現況') { plan.now = text; cur = 'now'; }
+      else if (label === '下一步' || label === '待確認事項') {
+        cur = label === '下一步' ? 'next' : 'pending';
+        if (text) plan[cur].push(splitTopic(text));
+      }
+      else if (bullet && label) { plan.others.push({ k: label, v: text }); cur = null; }
+      else { plan.loose.push(l.replace(/^[•・]\s*/, '')); cur = null; }
     });
     return plan;
   }
-  function planTable(items, quiet, fg) {
-    if (quiet === 'stack') return '<div class="crm-tb quiet stack">' + items.map(function(it){ return '<div><b>' + esc(it.k) + '</b>' + esc(it.v) + '</div>'; }).join('') + '</div>';
-    return '<div class="crm-tb' + (quiet ? ' quiet' : '') + '">' + items.map(function(it){
-      return '<div class="k"' + (quiet ? '' : ' style="color:' + fg + '"') + '>' + esc(it.k) + '</div><div>' + esc(it.v) + '</div>';
+  function itemList(items) {
+    if (!items.length) return '<div class="crm-none">—</div>';
+    return '<ul class="crm-items">' + items.map(function(it){
+      return it.k ? '<li><b>' + esc(it.k) + '</b><span>' + esc(it.v) + '</span></li>' : '<li class="nok"><span>' + esc(it.v) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  function stackList(items) {
+    return '<div class="crm-stack">' + items.map(function(it){
+      return '<div>' + (it.k ? '<b>' + esc(it.k) + '</b>' : '') + (it.v ? '<p>' + esc(it.v) + '</p>' : '') + '</div>';
     }).join('') + '</div>';
   }
-  function planCap(kind, colors, title, sub, titleColor, subColor) {
-    return '<div class="crm-cap" data-sheen="' + kind + '" data-colors="' + colors.join(',') + '">' +
-      '<canvas aria-hidden="true"></canvas><div class="crm-cap-tx"><div class="crm-cap-t1" style="color:' + titleColor + '">' + esc(title) + '</div>' +
-      (sub ? '<div class="crm-cap-t2" style="color:' + subColor + '">' + esc(sub) + '</div>' : '') + '</div></div>';
-  }
-  function planHtml(c) {
-    var plan = parsePlan(c.action);
-    if (!plan) return null;
-    var tint = crmTint(c.name), out = [], others = [];
-    plan.blocks.forEach(function(b){
-      if (b.label === '現況') {
-        out.push(planCap('dark', [tint.sheen[0], tint.sheen[1], '#6f86ff', '#ffe8c8'], '現況' + (plan.date ? '｜' + plan.date : ''), b.text, '#ffffff', '#d8d5cc'));
-      } else if (b.label === '下一步') {
-        out.push(planCap('light', tint.sheen, '下一步', b.items.length + ' 項', tint.fg, tint.fg));
-        if (b.items.length) out.push(planTable(b.items, false, tint.fg));
-      } else if (b.label === '待確認事項') {
-        out.push(planCap('light', CRM_SAND, '待確認事項', b.items.length + ' 項', '#4a3a2c', '#6b5644'));
-        if (b.items.length) out.push(planTable(b.items, true));
-      } else {
-        others.push({ k: b.label, v: b.text });
-      }
-    });
-    if (others.length) {
-      out.push(planCap('light', CRM_SAND, '其他持續事項', others.length + ' 條', '#4a3a2c', '#6b5644'));
-      out.push(planTable(others, 'stack'));
-    }
-    return '<div class="crm-plan">' + out.join('') + '</div>';
-  }
-
-  // 共用一個 WebGL 畫布算光澤，再複製到每個膠囊，避免瀏覽器同時開太多 WebGL
-  var crmSheen = { gl: null, caps: [], visible: new Set(), started: false, loading: false };
-  var CRM_SHEEN_FRAG = 'precision highp float;uniform float t;uniform float aspect;uniform vec3 base,c1,c2,c3,c4;uniform float dark;varying vec2 vUv;' +
-    'vec2 h(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return -1.+2.*fract(sin(p)*43758.5453);}' +
-    'float n(vec2 p){vec2 i=floor(p),f=fract(p),u=f*f*(3.-2.*f);return mix(mix(dot(h(i),f),dot(h(i+vec2(1,0)),f-vec2(1,0)),u.x),mix(dot(h(i+vec2(0,1)),f-vec2(0,1)),dot(h(i+vec2(1,1)),f-vec2(1,1)),u.x),u.y);}' +
-    'float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*n(p);p*=2.02;a*=.5;}return v;}' +
-    'void main(){vec2 uv=vUv;vec2 p=vec2(uv.x*aspect,uv.y);' +
-    'vec2 q=vec2(fbm(p*.45+vec2(t*.05,0.)),fbm(p*.45+vec2(5.2,t*.04)));' +
-    'float f=fbm(p*.5+1.6*q+vec2(-t*.06,t*.025));' +
-    'vec3 col=mix(c1,c2,smoothstep(-.3,.3,f));col=mix(col,c3,smoothstep(.15,.5,q.x));col=mix(col,c4,smoothstep(.2,.6,f+q.y));' +
-    'float d=abs(f-.05+.05*sin(t*.3)+.12*(uv.y-.5));float band=smoothstep(.035,0.,d);float glow=smoothstep(.16,0.,d);' +
-    'vec3 pr=.55+.45*cos(6.2831*(uv.x*.9+uv.y*.6+f*1.2+t*.04+vec3(0.,.33,.67)));' +
-    'col=mix(col,pr,glow*(dark>.5?.55:.35));col+=band*(dark>.5?pr*1.1:pr*.55);' +
-    'float m=smoothstep(.46,.9,uv.x)*(.55+.45*smoothstep(-.2,.4,f+.2));' +
-    'gl_FragColor=vec4(mix(base,col,clamp(m,0.,1.)),1.);}';
-  function crmSheenInit() {
-    if (crmSheen.gl) return true;
-    if (!window.THREE) return false;
-    try {
-      var r = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
-      r.setPixelRatio(1); r.setSize(960, 80, false);
-      var col = function(){ return { value: new THREE.Color('#ffffff') }; };
-      var u = { t: { value: 0 }, aspect: { value: 12 }, base: col(), c1: col(), c2: col(), c3: col(), c4: col(), dark: { value: 0 } };
-      var s = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      s.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: u, fragmentShader: CRM_SHEEN_FRAG,
-        vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.);}' })));
-      crmSheen.gl = { r: r, s: s, cam: cam, u: u };
-      return true;
-    } catch (e) { return false; }
-  }
-  function crmSheenDraw(cap, time) {
-    var g = crmSheen.gl, el = cap.el, cv = cap.cv, w = el.clientWidth, hh = el.clientHeight;
-    if (!w || !hh) return;
-    var dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(hh * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); }
-    g.u.t.value = time + cap.seed; g.u.aspect.value = w / hh; g.u.dark.value = cap.dark ? 1 : 0;
-    g.u.base.value.set(cap.dark ? '#1c1b1d' : '#ffffff');
-    ['c1', 'c2', 'c3', 'c4'].forEach(function(k, i){ g.u[k].value.set(cap.colors[i]); });
-    g.r.render(g.s, g.cam);
-    cv.getContext('2d').drawImage(g.r.domElement, 0, 0, cv.width, cv.height);
-  }
-  function crmSheenScan() {
-    var els = document.querySelectorAll('#client-list .crm-cap');
-    if (!els.length) return;
-    if (!window.THREE) {
-      if (!crmSheen.loading) {
-        crmSheen.loading = true;
-        var sc = document.createElement('script');
-        sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-        sc.onload = crmSheenScan;
-        document.head.appendChild(sc);
-      }
-      return;
-    }
-    if (!crmSheenInit()) return;
-    if (crmSheen.io) crmSheen.io.disconnect();
-    crmSheen.visible.clear();
-    crmSheen.caps = Array.prototype.map.call(els, function(el, i){
-      return { el: el, cv: el.querySelector('canvas'), dark: el.dataset.sheen === 'dark', colors: el.dataset.colors.split(','), seed: i * 7.3 };
-    });
-    crmSheen.io = new IntersectionObserver(function(entries){
-      entries.forEach(function(e){
-        var cap = crmSheen.caps.filter(function(c){ return c.el === e.target; })[0];
-        if (!cap) return;
-        if (e.isIntersecting) { crmSheen.visible.add(cap); crmSheenDraw(cap, performance.now() / 1000); } else crmSheen.visible.delete(cap);
-      });
-    });
-    crmSheen.caps.forEach(function(c){ crmSheen.io.observe(c.el); });
-    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce || crmSheen.started) return;
-    crmSheen.started = true;
-    (function loop(){
-      if (!document.hidden) crmSheen.visible.forEach(function(c){ if (document.body.contains(c.el)) crmSheenDraw(c, performance.now() / 1000); });
-      requestAnimationFrame(loop);
-    })();
+  function crmCell(label, inner, cls) {
+    return '<div' + (cls ? ' class="' + cls + '"' : '') + '><div class="crm-lab">' + label + '</div>' + inner + '</div>';
   }
 
   function renderClients() {
     var el = document.getElementById('client-list');
     if (!CRM_DATA.length) { el.innerHTML = '<div class="empty">沒有客戶資料</div>'; return; }
     el.innerHTML = sortedClients(CRM_DATA).map(function(c){
-      var sc = STATUS_COLOR[c.status] || 'tgray';
-      var pc = PRIORITY_COLOR[c.priority] || 'tgray';
+      var plan = parsePlan(c.action);
+      var sub = [[c.status, c.priority].filter(Boolean).join('、'), '資料更新 ' + (c.lastdate || '未填寫')].filter(Boolean);
+      var now, next, pending, others = [];
+      if (plan) {
+        now = plan.now ? '<p>' + esc(plan.now) + '</p>' : '';
+        next = itemList(plan.next);
+        pending = itemList(plan.pending);
+        others = plan.others.concat(plan.loose.map(function(v){ return { k: '', v: v }; }));
+      } else {
+        // 舊格式：原文逐行放在現況欄，不顯示下一步與待確認欄，避免猜測拆分
+        now = planLines(c.action).map(function(l){ return '<p>' + esc(l.replace(/^[•・-]\s*/, '')) + '</p>'; }).join('');
+        next = pending = '';
+      }
       var extra = [
         c.reaction ? '客戶反應：' + c.reaction : '',
         c.contact ? '聯繫方式：' + c.contact : '',
         c.amount ? '金額：NT$' + c.amount.toLocaleString() : ''
       ].filter(Boolean);
-      var ph = planHtml(c), dates = '<div class="client-dates">資料更新日期：' + esc(c.lastdate || '未填寫') + '</div>';
       return '<details class="client-card" data-client-id="' + esc(c.id) + '"' + (_expandedClients[c.id] ? ' open' : '') + ' ontoggle="toggleClientDetail(this)">' +
-        '<summary class="client-row">' +
-          '<div class="client-info">' +
-            '<div class="client-name">' + esc(c.name || '未命名') + '</div>' +
-            (ph ? '' : '<div class="client-meta">' + actionLines(c.action) + '</div>' + dates) +
-          '</div>' +
-          '<div class="client-tags">' +
-            (c.status ? '<span class="tag ' + sc + '"><small style="opacity:0.7">狀態：</small>' + esc(c.status) + '</span>' : '') +
-            (c.priority ? '<span class="tag ' + pc + '"><small style="opacity:0.7">優先：</small>' + esc(c.priority) + '</span>' : '') +
-          '</div>' +
-          (ph ? '<div class="crm-plan-row">' + ph + dates + '</div>' : '') +
+        '<summary class="crm-grid' + (plan ? '' : ' crm-old') + '">' +
+          '<div><div class="client-name">' + esc(c.name || '未命名') + '</div><div class="crm-sub">' + sub.map(function(v){ return '<div>' + esc(v) + '</div>'; }).join('') + '</div></div>' +
+          crmCell('現況', '<div class="crm-now">' + (now || '<span class="crm-none">尚未填寫</span>') + '</div>', 'crm-c-now') +
+          (next ? crmCell('下一步', next) : '') +
+          (pending ? crmCell('待確認事項', pending) : '') +
+          (others.length ? '<div class="crm-others"><div class="crm-lab2">其他持續事項</div>' + stackList(others) + '</div>' : '') +
           '<svg class="client-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>' +
         '</summary>' +
         '<div class="client-detail">' +
-          '<div class="client-detail-head"><h3>歷史日誌</h3><a href="https://drive.google.com/drive/search?q=' + encodeURIComponent(c.name || '') + '" target="_blank" rel="noopener noreferrer">Google Drive 搜尋</a></div>' +
-          (extra.length ? '<div class="client-extra">' + extra.map(function(value){ return '<span>' + esc(value) + '</span>'; }).join('') + '</div>' : '') +
-          '<div id="client-history-' + esc(c.id) + '" aria-live="polite"><div class="empty">展開後載入歷史日誌</div></div>' +
+          (extra.length ? '<div class="crm-sec"><div class="client-extra">' + extra.map(function(value){ return '<span>' + esc(value) + '</span>'; }).join('') + '</div></div>' : '') +
+          '<div class="crm-sec"><div class="client-detail-head"><h4>歷史日誌</h4><a href="https://drive.google.com/drive/search?q=' + encodeURIComponent(c.name || '') + '" target="_blank" rel="noopener noreferrer">Google Drive 搜尋</a></div>' +
+          '<div id="client-history-' + esc(c.id) + '" aria-live="polite"><div class="empty">展開後載入歷史日誌</div></div></div>' +
         '</div>' +
       '</details>';
     }).join('');
     Object.keys(_expandedClients).forEach(function(id){
       if (_expandedClients[id] && document.getElementById('client-history-' + id)) loadClientLog(id);
     });
-    crmSheenScan();
   }
 
   function goUpdate(id) {
@@ -4199,15 +4090,7 @@
       return r.json();
     }).then(function(data){
       if (!Array.isArray(data.results)) throw new Error('歷史日誌格式不完整');
-      var lines = data.results.map(function(b){
-        var seg = (b.paragraph && b.paragraph.rich_text)
-          || (b.heading_1 && b.heading_1.rich_text)
-          || (b.heading_2 && b.heading_2.rich_text)
-          || (b.heading_3 && b.heading_3.rich_text)
-          || (b.bulleted_list_item && b.bulleted_list_item.rich_text)
-          || [];
-        return seg.map(function(t){ return t.plain_text || ''; }).join('').trim();
-      }).filter(function(l){ return l && l.indexOf('歷史日誌') === -1; });
+      var lines = parseLog(logBlocks(data.results));
       if (revision !== _historyRevision) return;
       _historyCache[clientId] = lines;
       var target = document.getElementById('client-history-' + clientId);
@@ -4229,24 +4112,99 @@
     return request;
   }
 
-  function renderLog(lines, listEl) {
-    if (!lines.length) {
+  // 歷史日誌：依日期分組；每則主題或第一句粗體當摘要，說明放下方；日期說明、須知等內部註記不顯示
+  var LOG_DATE = /^(\d{1,2}\/\d{1,2}(?:\s*[–-]\s*\d{1,2}(?:\/\d{1,2})?)?|\d{1,2}月[^\s　<]*)\s*([\s\S]*)$/;
+  var LOG_NOTE = /^(日期說明|說明|注意|須知|備註|提醒|重要)[：:]/;
+  function logBlocks(results) {
+    return results.map(function(b){
+      var body = b[b.type] || {}, rich = body.rich_text;
+      if (!Array.isArray(rich)) return null;
+      return { type: b.type, segs: rich.map(function(t){ return { text: t.plain_text || '', href: t.href || '' }; }) };
+    }).filter(function(b){ return b && b.segs.some(function(s){ return s.text.trim(); }); });
+  }
+  function logParts(segs) {
+    var parts = [[]];
+    segs.forEach(function(s){
+      s.text.split(/<br\s*\/?>/i).forEach(function(piece, i){
+        if (i > 0) parts.push([]);
+        if (piece) parts[parts.length - 1].push({ text: piece, href: s.href });
+      });
+    });
+    return parts.map(function(p){
+      return { text: p.map(function(s){ return s.text; }).join('').trim(), links: p.filter(function(s){ return s.href && s.text.trim(); }).map(function(s){ return { text: s.text.trim(), href: s.href }; }),
+        plain: p.filter(function(s){ return !s.href; }).map(function(s){ return s.text; }).join('') };
+    }).filter(function(p){ return p.text; });
+  }
+  function parseLog(blocks) {
+    var notes = [], days = [], day = null;
+    function addEntry(p) {
+      var text = p.text.replace(/^[•・\-]\s*/, '').trim();
+      if (!text) return;
+      var srcOnly = /^\[?(Slack\s*)?來源/.test(text) || (p.links.length && !p.plain.replace(/[•・\-\s：:；;、，,()（）\[\]]|來源/g, ''));
+      if (srcOnly) {
+        var last = day && day.entries[day.entries.length - 1];
+        if (last) last.links = last.links.concat(p.links);
+        return;
+      }
+      if (LOG_NOTE.test(text) || !day) { notes.push(text); return; }
+      var tail = p.links.length && p.links[p.links.length - 1].text;
+      if (tail && text.slice(-tail.length) === tail) text = text.slice(0, -tail.length).trim();
+      day.entries.push({ text: text.replace(/^20\d\d\/\d{1,2}\/\d{1,2}\s*(補存)?\s*[：:]?\s*/, ''), links: p.links });
+    }
+    blocks.forEach(function(b){
+      var all = b.segs.map(function(s){ return s.text; }).join('').trim();
+      if (/^heading_/.test(b.type)) {
+        if (all.indexOf('歷史日誌') !== -1) return;
+        var hm = LOG_DATE.exec(all);
+        day = { date: hm ? hm[1] : all, entries: [] };
+        days.push(day);
+        if (hm && hm[2]) addEntry({ text: hm[2], links: [], plain: hm[2] });
+        return;
+      }
+      if (b.type === 'callout' || b.type === 'quote') { notes.push(all); return; }
+      logParts(b.segs).forEach(function(p, i){
+        var dm = i === 0 && b.type === 'paragraph' ? LOG_DATE.exec(p.text) : null;
+        if (dm) {
+          day = { date: dm[1], entries: [] };
+          days.push(day);
+          if (dm[2]) addEntry({ text: dm[2], links: p.links, plain: dm[2] });
+          return;
+        }
+        addEntry(p);
+      });
+    });
+    return { notes: notes, days: days.filter(function(d){ return d.entries.length; }) };
+  }
+  function logSummary(text) {
+    // 有主題時主題當摘要、內容放下方說明；沒有主題時取第一句當摘要，其餘放說明；短句不另設摘要
+    var t = splitTopic(text), body = t.v;
+    if (t.k) return { title: t.k, detail: body };
+    if (body.length <= 45) return { title: '', detail: body };
+    var stop = body.search(/[。！？]/);
+    if (stop > 0 && stop <= 60 && stop < body.length - 1) return { title: body.slice(0, stop + 1), detail: body.slice(stop + 1).trim() };
+    var clause = body.search(/[，；;]/);
+    if (clause > 0 && clause <= 40) return { title: body.slice(0, clause), detail: body.slice(clause + 1).trim() };
+    return { title: '', detail: body };
+  }
+  function logLinks(links) {
+    if (!links.length) return '';
+    return '<div class="crm-src">連結：' + links.map(function(l){
+      return /^(https?:|slack:)/i.test(l.href) ? '<a href="' + esc(l.href) + '" target="_blank" rel="noopener noreferrer">' + esc(l.text) + '</a>' : esc(l.text);
+    }).join('、') + '</div>';
+  }
+  function renderLog(log, listEl) {
+    if (!log.days.length) {
       listEl.innerHTML = '<div class="empty">尚無歷史日誌</div>';
       return;
     }
-    var html = '<div class="timeline">';
-    lines.forEach(function(l, i){
-      var m = /^([0-9]{1,2}\/[0-9]{1,2}|[0-9]{1,2}月[^\s　]*)[\s　]+([\s\S]*)$/.exec(l);
-      var date = m ? m[1] : '';
-      var content = m ? m[2] : l;
-      html += '<div class="timeline-item">' +
-        '<div class="tl-left"><div class="tl-dot' + (i > 0 ? ' old' : '') + '"></div><div class="tl-line"></div></div>' +
-        '<div class="tl-body">' +
-          (date ? '<div class="tl-date">' + esc(date) + '</div>' : '') +
-          '<div class="tl-content">' + esc(content) + '</div>' +
-        '</div></div>';
+    var html = '';
+    log.days.forEach(function(d){
+      html += '<div class="crm-day"><div class="crm-day-date">' + esc(d.date) + '</div><div class="crm-stack">' + d.entries.map(function(e){
+        var s = logSummary(e.text);
+        return '<div>' + (s.title ? '<b>' + esc(s.title) + '</b>' : '') + (s.detail ? '<p>' + esc(s.detail) + '</p>' : '') + logLinks(e.links) + '</div>';
+      }).join('') + '</div></div>';
     });
-    listEl.innerHTML = html + '</div>';
+    listEl.innerHTML = html;
   }
 
   function submitUpdateFromModal() {
