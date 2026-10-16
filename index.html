@@ -1360,8 +1360,8 @@
     #page-crm-dashboard .client-tags { max-width: 180px; padding-top: 4px; }
     /* CRM 固定寫法：膠囊標題（右端 three.js 流動光澤，參考 A34）＋有框線的對齊表格 */
     #page-crm-dashboard .client-card > summary { flex-wrap: wrap; }
-    #page-crm-dashboard .crm-plan-row { width: 100%; flex: 0 0 auto; min-width: 0; max-width: 1040px; }
-    #page-crm-dashboard .crm-plan { margin-top: 0; }
+    #page-crm-dashboard .crm-plan-row { flex: 0 0 100%; width: 100%; min-width: 0; }
+    #page-crm-dashboard .crm-plan { margin-top: 0; max-width: 1100px; }
     #page-crm-dashboard .crm-cap { position: relative; min-height: 80px; border-radius: 40px; overflow: hidden; display: flex; align-items: center; padding: 10px 28px; margin: 0 0 10px; box-shadow: 0 8px 20px rgba(40, 30, 60, .10); }
     #page-crm-dashboard .crm-cap canvas { position: absolute; top: -14px; left: -14px; width: calc(100% + 28px); height: calc(100% + 28px); display: block; filter: blur(2px); }
     #page-crm-dashboard .crm-cap-tx { position: relative; z-index: 1; max-width: 64%; }
@@ -1418,6 +1418,7 @@
     @media (prefers-reduced-motion: reduce) { #page-crm-dashboard .client-chevron { transition: none; } }
     @media (max-width: 720px) {
       #page-crm-dashboard .client-row { flex-direction: column; gap: 10px; }
+      #page-crm-dashboard .crm-plan-row { flex: 0 0 auto; }
       #page-crm-dashboard .client-tags { max-width: none; justify-content: flex-start; padding: 0; }
       .crm-list-toolbar { gap: 12px 8px; }
       .crm-list-toolbar .ct { flex-basis: 100%; }
