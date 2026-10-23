@@ -8,3 +8,5 @@
 !hr-worker.js
 !crm-worker.js
 !server.js
+!crm-worker.test.cjs
+!hr-worker.test.cjs

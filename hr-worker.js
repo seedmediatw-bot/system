@@ -281,6 +281,9 @@ async function handleHR(request, env, pathname, origin) {
 // ── Gemini 模組 ───────────────────────────────────────────────
 
 async function handleGemini(request, env, origin) {
+  if (!authCheck(request, env.HR_ACCESS_KEY)) {
+    return errResponse('Unauthorized Access', origin, 401);
+  }
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) return errResponse('Gemini API key not configured', origin, 500);
   try {
