@@ -10,3 +10,13 @@
 !server.js
 !crm-worker.test.cjs
 !hr-worker.test.cjs
+
+# v2 重建（白名單）
+!v2/
+!v2/*
+!v2/src/
+!v2/src/*
+!v2/public/
+!v2/public/*
+!v2/dist/
+!v2/dist/*
