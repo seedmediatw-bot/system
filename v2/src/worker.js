@@ -117,6 +117,8 @@ const getText = (pr, k) => plain(pr[k] && (pr[k].rich_text || pr[k].title));
 const getSel = (pr, k) => (pr[k] && pr[k].select && pr[k].select.name) || '';
 const getNum = (pr, k) => (pr[k] && pr[k].number != null ? pr[k].number : null);
 const getDate = (pr, k) => (pr[k] && pr[k].date && pr[k].date.start) || '';
+// CRM 的長文字欄位用 <br /> 表示換行，轉成真正的換行再顯示
+const brText = t => String(t || '').replace(/<br\s*\/?>/gi, '\n');
 const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 const sameId = (a, b) => String(a || '').replace(/-/g, '') === String(b || '').replace(/-/g, '');
 
@@ -486,7 +488,7 @@ async function api(request, env, ctx, url) {
 
   if (path === '/api/clients' && method === 'GET') {
     const rows = await queryDb(env.CRM_TOKEN, env.DB_CRM, { sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }], page_size: 100 });
-    return json({ items: rows.map(r => ({ id: r.id, name: getText(r.properties, '客戶名稱'), status: getSel(r.properties, '潛在客戶狀態'), priority: getSel(r.properties, '優先級'), action: getText(r.properties, '下一步行動'), commitment: getText(r.properties, '承諾事項'), notes: getText(r.properties, '詳細現況備註'), amount: getNum(r.properties, '專案金額'), updated: (r.last_edited_time || '').slice(0, 10) })) });
+    return json({ items: rows.map(r => ({ id: r.id, name: getText(r.properties, '客戶名稱'), status: getSel(r.properties, '潛在客戶狀態'), priority: getSel(r.properties, '優先級'), action: brText(getText(r.properties, '下一步行動')), commitment: brText(getText(r.properties, '承諾事項')), notes: brText(getText(r.properties, '詳細現況備註')), amount: getNum(r.properties, '專案金額'), updated: (r.last_edited_time || '').slice(0, 10) })) });
   }
   if ((m = path.match(/^\/api\/clients\/([0-9a-fA-F-]{32,36})\/log$/)) && method === 'GET') {
     const page = await loadPageIn(env.CRM_TOKEN, env.DB_CRM, m[1]);

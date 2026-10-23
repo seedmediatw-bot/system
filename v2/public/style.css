@@ -106,3 +106,5 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 .day-row { grid-template-columns: auto 1fr auto; align-items: center; cursor: pointer; }
 .day-row input { width: 22px; min-height: 22px; accent-color: var(--accent); }
+
+.client-body p { white-space: pre-wrap; overflow-wrap: anywhere; }
