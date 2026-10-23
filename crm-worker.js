@@ -108,6 +108,9 @@ async function handleCRM(request, env, pathname, origin) {
 // ── Gemini 模組 ───────────────────────────────────────────────
 
 async function handleGemini(request, env, origin) {
+  if (!authCheck(request, env.CRM_ACCESS_KEY) && !await validCrmSession(request, env)) {
+    return errResponse('Unauthorized Access', origin, 401);
+  }
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) return errResponse('Gemini API key not configured', origin, 500);
   try {

@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 let now = Date.now();
 let upstreamCalls = [];
-const env = { CRM_ACCESS_KEY:'test-service-key', CRM_PASSWORD:'test-password', ADMIN_PASSWORD:'test-admin', CRM_TOKEN:'test-notion', DB_CRM:'test-crm' };
+const env = { CRM_ACCESS_KEY:'test-service-key', CRM_PASSWORD:'test-password', ADMIN_PASSWORD:'test-admin', CRM_TOKEN:'test-notion', DB_CRM:'test-crm', GEMINI_API_KEY:'test-gemini' };
 const context = vm.createContext({ crypto:webcrypto, TextEncoder, Uint8Array, Request, Response, URL, console,
   Date:class extends Date { static now() { return now; } },
   fetch:async (url, options) => { upstreamCalls.push({url,options});return Response.json({results:[]}); },
@@ -25,6 +25,13 @@ const call = (path,key,body,settings=env) => context.worker.fetch(request(path,k
   assert.equal((await call('/api/crm/blocks/test-client/children?page_size=100',session.accessKey)).status,200);
   assert.ok(upstreamCalls.at(-1).url.endsWith('/blocks/test-client/children?page_size=100'));
   assert.equal((await call('/api/crm/pages',session.accessKey,{properties:{}})).status,200);
+  // R2: Gemini AI 端點需驗證（CRM）
+  const gBefore=upstreamCalls.length;
+  assert.equal((await call('/api/gemini',null,{contents:[]})).status,401,'Gemini 無金鑰須 401');
+  assert.equal((await call('/api/gemini','garbage',{contents:[]})).status,401,'Gemini 錯金鑰須 401');
+  assert.equal(upstreamCalls.length,gBefore,'未授權的 Gemini 不得呼叫上游');
+  assert.equal((await call('/api/gemini',env.CRM_ACCESS_KEY,{contents:[]})).status,200,'服務金鑰可用 Gemini');
+  assert.equal((await call('/api/gemini',session.accessKey,{contents:[]})).status,200,'有效 session 可用 Gemini');
   const before=upstreamCalls.length;
   const tampered = session.accessKey.slice(0,-1)+(session.accessKey.endsWith('0')?'1':'0');
   for(const token of ['', 'garbage',tampered,session.accessKey.replace('crm1.','hr1.')]) {
@@ -41,5 +48,5 @@ const call = (path,key,body,settings=env) => context.worker.fetch(request(path,k
   assert.equal((await call('/api/crm/talks',env.CRM_ACCESS_KEY)).status,404,'Retired timeline endpoint must be absent');
   const admin=await (await call('/api/auth',null,{system:'admin',password:env.ADMIN_PASSWORD})).json();
   assert.equal(admin.ok,true);assert.equal(admin.accessKey,null);
-  console.log('PASS: login, 8-hour expiry, tampering, scope, password rotation, no-store, Notion query/history/write proxy, LINE service key, retired timeline endpoint, admin');
+  console.log('PASS: login, 8-hour expiry, tampering, scope, password rotation, no-store, Notion query/history/write proxy, Gemini auth gate, LINE service key, retired timeline endpoint, admin');
 })().catch(e=>{console.error(e);process.exitCode=1;});

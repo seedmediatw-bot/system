@@ -2597,6 +2597,7 @@
     var hrApiBase  = localStorage.getItem('hrApiBase')  || 'https://hr-system123.seedmediatw.workers.dev';
     var crmApiBase = localStorage.getItem('crmApiBase') || 'https://crm-system456.seedmediatw.workers.dev';
     function activeApiBase() { return pendingSystem === 'crm' ? crmApiBase : hrApiBase; }
+    function activeH()       { return { 'Content-Type': 'application/json', 'X-Access-Key': pendingSystem === 'crm' ? crmKey : hrKey }; }
   // --- CRM Variables ---
   var CRM_DATA = [];
   var selectedClientId = '';
@@ -2956,7 +2957,7 @@
         parts.push({ text: '請辨識這' + images.length + '張發票或收據。這可能是台灣統一發票（只有 QR Code 和總金額）或一般收據（有明細）。\n處理規則：\n1. 若是台灣統一發票：請嘗試讀取 QR Code 取得日期與金額；若 QR Code 無法讀取，則從畫面上的數字取得總金額與日期；描述填「發票消費」或店家名稱（若可見）。\n2. 若是一般收據：依明細各自列一筆，填入品項名稱、類別、日期、金額。\n3. 若一張發票有多筆可辨識明細就拆成多筆；若只有總金額就填一筆。\n只回傳 JSON 陣列，不要其他文字，格式：[{"desc":"費用說明","cat":"類別","date":"YYYY-MM-DD","amount":數字},...]。類別只能是：' + CATS.join('、') + '。日期若無法辨識請填今天：' + new Date().toISOString().split('T')[0] + '。' });
         return fetch(activeApiBase() + '/api/gemini', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: activeH(),
           body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: parts }] })
         });
       })
@@ -3244,12 +3245,25 @@
                 list.innerHTML = '<div class="empty">此申請沒有附帶圖片<br><small style="color:var(--text3);font-size:11px">區塊類型：' + types + '</small></div>';
                 return;
             }
-            list.innerHTML = imgs.map(function(b){
-                var img = b.image;
-                var url = img.type === 'file' ? img.file.url : img.type === 'file_upload' ? (img.file_upload && img.file_upload.url) : img.external && img.external.url;
-                if (!url) return '<div style="color:var(--danger);font-size:12px">圖片 URL 無法取得（type:' + img.type + '）</div>';
-                return '<div style="margin-bottom:16px"><img src="' + url + '" style="width:100%;border-radius:8px;border:1px solid var(--border);display:block"></div>';
+            function receiptUrl(b){ var img=b.image; return img.type === 'file' ? img.file.url : img.type === 'file_upload' ? (img.file_upload && img.file_upload.url) : img.external && img.external.url; }
+            list.innerHTML = imgs.map(function(b, i){
+                var url = receiptUrl(b);
+                if (!url) return '<div style="color:var(--danger);font-size:12px">圖片 URL 無法取得（type:' + b.image.type + '）</div>';
+                return '<div style="margin-bottom:16px"><img id="rcpt-img-' + i + '" alt="收據載入中…" style="width:100%;border-radius:8px;border:1px solid var(--border);display:block"></div>';
             }).join('');
+            // R5：私有收據以帶驗證的代理端點取回後用 blob 顯示；舊的公開連結維持直接顯示（向後相容）。
+            imgs.forEach(function(b, i){
+                var url = receiptUrl(b), el = document.getElementById('rcpt-img-' + i);
+                if (!el || !url) return;
+                if (url.indexOf('/api/hr/receipt') >= 0) {
+                    fetch(url, { headers: { 'X-Access-Key': hrKey } })
+                        .then(function(r){ if (!r.ok) throw new Error(); return r.blob(); })
+                        .then(function(bl){ el.src = URL.createObjectURL(bl); })
+                        .catch(function(){ el.alt = '收據載入失敗'; });
+                } else {
+                    el.src = url;
+                }
+            });
         }).catch(function(){
             list.innerHTML = '<div class="empty" style="color:var(--danger)">無法讀取附件，請確認 Notion 連線</div>';
         });
@@ -3471,7 +3485,7 @@
       var loading = document.createElement('div'); loading.className = 'aimsg bot'; loading.textContent = '思考中...';
       document.getElementById('aimsgs').appendChild(loading);
       fetch(activeApiBase() + '/api/gemini', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: activeH(),
         body: JSON.stringify({
           model: 'gemini-2.5-flash',
           systemInstruction: { parts: [{ text: '你是 HR 系統的 AI 助理，協助使用者操作系統（請假、報帳、入職、查詢、Notion 設定）。請用繁體中文簡潔回答，不超過 120 字。' }] },
@@ -4476,7 +4490,7 @@
       var parts = imgParts.concat([{ text: AI_PROMPT + (text.trim() || '（請從圖片中擷取所有客戶相關資訊）') }]);
       return fetch(activeApiBase() + '/api/gemini', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: activeH(),
         body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: parts }] })
       });
     })
@@ -4674,7 +4688,7 @@
       var parts = imgParts.concat([{ text: BATCH_PROMPT + (text || '（請從圖片中找出所有客戶資訊）') }]);
       return fetch(crmApiBase + '/api/gemini', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: crmH(),
         body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: parts }] })
       });
     })
