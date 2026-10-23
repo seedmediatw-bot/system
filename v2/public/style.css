@@ -24,7 +24,9 @@ p { margin: 0 0 .75rem; }
 .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 .nav { border-right: 1px solid var(--line); padding: 1.25rem .75rem; position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--surface); }
 .brand { display: flex; align-items: center; gap: .6rem; padding: 0 .5rem 1.25rem; font-weight: 700; }
-.brand img { width: 28px; height: 28px; }
+.brand { color: var(--accent); }
+.brand span { color: var(--ink); }
+.brand .navicon { width: 30px; height: 30px; }
 .nav a { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border-radius: var(--radius); color: var(--ink); text-decoration: none; min-height: 44px; }
 .navicon { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .nav a:hover { background: var(--surface2); }

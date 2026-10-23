@@ -14,6 +14,8 @@
     clock: [['circle', { cx: '12', cy: '12', r: '10' }], ['path', { d: 'M12 6v6l4 2' }]],
     check: [['circle', { cx: '12', cy: '12', r: '10' }], ['path', { d: 'm16 9-5.5 5.5L8 12' }]],
     briefcase: [['path', { d: 'M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16' }], ['rect', { width: '20', height: '14', x: '2', y: '6', rx: '2' }]],
+    sprout: [['path', { d: 'M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3' }], ['path', { d: 'M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4' }], ['path', { d: 'M5 21h14' }]],
+    tree: [['path', { d: 'M8 19a4 4 0 0 1-2.24-7.32A3.5 3.5 0 0 1 9 6.03V6a3 3 0 1 1 6 0v.04a3.5 3.5 0 0 1 3.24 5.65A4 4 0 0 1 16 19Z' }], ['path', { d: 'M12 19v3' }]],
     users: [['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }], ['path', { d: 'M16 3.128a4 4 0 0 1 0 7.744' }], ['path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }], ['circle', { cx: '9', cy: '7', r: '4' }]]
   };
   // 每一條輪廓有 a（起點）與 b（終點）：兩者都有就形變；只有 a 就收回；只有 b 就畫出。
@@ -23,6 +25,7 @@
     expense: [[{ a: N.receipt[2], b: N.coin[0] }, { a: N.receipt[1], b: N.coin[1] }, { a: N.receipt[0], b: N.coin[2] }], [5300, 360, 1850, 1300]],
     leave: [[{ a: N.calendar[2], b: N.sun[0] }, { a: N.calendar[0] }, { a: N.calendar[1] }, { a: N.calendar[3] }].concat(N.sun.slice(1).map(function (b) { return { b: b }; })), [6100, 380, 2150, 2050]],
     checkin: [[{ a: N.clock[0], b: N.check[0] }, { a: N.clock[1], b: N.check[1] }], [4900, 360, 1750, 2800]],
+    brand: [[{ a: N.sprout[1], b: N.tree[0] }, { a: N.sprout[0], b: N.tree[1] }, { a: N.sprout[2] }], [5700, 400, 2000, 900]],
     clients: [[{ a: N.briefcase[1], b: N.users[3] }, { a: N.briefcase[0], b: N.users[0] }, { b: N.users[1] }, { b: N.users[2] }], [6500, 440, 2300, 3500]]
   };
 

@@ -68,7 +68,7 @@
   function renderNav(current) {
     var nav = $('nav');
     if (!nav.firstChild) {
-      nav.appendChild(h('div', { class: 'brand' }, h('img', { src: '/favicon.svg', alt: '' }), '種子 內部系統'));
+      nav.appendChild(h('div', { class: 'brand' }, window.NavIcons.create('brand'), h('span', { text: '種子 內部系統' })));
       PAGES.forEach(function (p) {
         nav.appendChild(h('a', { href: '#' + p.id, 'data-page': p.id }, window.NavIcons.create(p.id), h('span', { text: p.label })));
       });
