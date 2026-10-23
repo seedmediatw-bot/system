@@ -288,6 +288,22 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   lineEnv.LINE_ALLOWED_USER_IDS = 'U9';
   await lineCall(raw1, await mac(raw1)); await Promise.all(ctx.pending);
   assert.equal(replies(), r0 + 1, '操作人不在名單不得回覆');
+  // 一次性設定：LINE_GROUP_ID 沒填時，@Bot「群組編號」會回覆群組編號；填了就失效；簽章不對一律拒絕
+  const idEvent = (groupId, text = '@bot 群組編號') => JSON.stringify({ events: [{ type: 'message', replyToken: 'rt2', source: { type: 'group', groupId, userId: 'U1' }, message: { type: 'text', text, mention: { mentionees: [{ isSelf: true }] } } }] });
+  const noGroupEnv = { ...lineEnv, LINE_GROUP_ID: undefined, LINE_ALLOWED_USER_IDS: undefined };
+  const sendTo = async (e, raw, sig) => worker.fetch(new Request(origin + '/api/line/webhook', { method: 'POST', headers: sig ? { 'x-line-signature': sig } : {}, body: raw }), e, ctx);
+  let rr = replies();
+  const idRaw = idEvent('Cnew123');
+  assert.equal((await sendTo(noGroupEnv, idRaw, 'bad')).status, 401, '簽章不對不得回覆群組編號');
+  await Promise.all(ctx.pending);
+  assert.equal(replies(), rr, '簽章不對不得回覆');
+  assert.equal((await sendTo(noGroupEnv, idRaw, await mac(idRaw))).status, 200);
+  await Promise.all(ctx.pending);
+  assert.equal(replies(), rr + 1, 'LINE_GROUP_ID 沒填時應回覆群組編號');
+  assert.match(calls.filter(c => c.url.includes('/message/reply')).pop().body, /Cnew123/);
+  assert.equal((await sendTo({ ...lineEnv, LINE_ALLOWED_USER_IDS: undefined }, idRaw, await mac(idRaw))).status, 200);
+  await Promise.all(ctx.pending);
+  assert.equal(replies(), rr + 1, 'LINE_GROUP_ID 填了以後，群組編號指令必須失效');
   assert.equal((await worker.fetch(new Request(origin + '/', { method: 'GET' }), lineEnv, ctx)).status, 404, 'LINE 專用 Worker 不提供網頁');
   assert.equal((await worker.fetch(new Request(origin + '/api/home', { method: 'GET' }), lineEnv, ctx)).status, 404, 'LINE 專用 Worker 不提供 API');
   console.log('PASS LINE 簽章、群組、操作人');

@@ -46,6 +46,12 @@ LINE 金鑰與群組編號只放在 LINE Worker 一處，網站 Worker 不持有
 
 Google 端的設定：在 Google Cloud 建立 OAuth 用戶端（網頁應用程式），授權的重新導向 URI 填 `https://<網站網址>/auth/callback`，範圍只用 `openid` 與 `email`。
 
+### LINE 頻道登不進後台或要改建新官方帳號
+
+- **通知不依賴後台登入**：發通知只需要 `LINE_CHANNEL_TOKEN` 與 `LINE_GROUP_ID`，這兩個已存在 LINE Worker，頻道還在就持續有效。
+- **登不進 LINE 後台**：拿不到 Channel secret，就先不填 `LINE_CHANNEL_SECRET`。通知照常發；群組內 @Bot 查詢會因驗不了簽章而被拒絕（安全的失敗方式），等拿到 secret 再補。
+- **改建新官方帳號**：換上新頻道的 `LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`，Webhook URL 指向 `https://<LINE Worker>/api/line/webhook`，把 Bot 邀進新群組。`LINE_GROUP_ID` 先留空，在新群組 @Bot 說「群組編號」，它會回覆編號，填進 `LINE_GROUP_ID` 後該指令即失效。
+
 ### 環境變數（在 Cloudflare 填，不寫進程式或對話）
 
 | 變數 | seed-house | hr-system123（LINE） |

@@ -336,6 +336,12 @@ async function dailyNotice(env) {
 
 async function handleLineEvent(event, env) {
   if (event.type !== 'message' || !event.message || event.message.type !== 'text') return;
+  // 一次性設定：LINE_GROUP_ID 還沒填時，在群組 @Bot 說「群組編號」會回覆該群組的編號；填好之後此指令失效
+  if (!env.LINE_GROUP_ID && event.source && event.source.type === 'group'
+    && ((event.message.mention || {}).mentionees || []).some(m => m.isSelf === true)
+    && String(event.message.text || '').replace(/@\S+/g, '').trim() === '群組編號') {
+    return lineReply(env, event.replyToken, '這個群組的編號：\n' + event.source.groupId + '\n請把它填進 LINE_GROUP_ID 變數。');
+  }
   if (!event.source || event.source.type !== 'group' || !env.LINE_GROUP_ID || event.source.groupId !== env.LINE_GROUP_ID) return;
   const allowed = csv(env.LINE_ALLOWED_USER_IDS);
   if (allowed.length && !allowed.includes(String(event.source.userId || ''))) return;
