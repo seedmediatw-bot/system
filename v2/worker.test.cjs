@@ -20,10 +20,10 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   };
 
   const fakeFetch = async (url, opts = {}) => {
-    calls.push({ url: String(url), method: opts.method || 'GET', body: opts.body });
+    calls.push({ url: String(url), method: opts.method || 'GET', body: opts.body, notifyKey: (opts.headers || {})['X-Notify-Key'] });
     url = String(url);
     if (url.endsWith('/cdn-cgi/access/certs')) return respond({ keys: [jwk] });
-    if (url.startsWith('https://api.line.me/')) return respond({});
+    if (url.startsWith('https://api.line.me/') || url.startsWith('https://line.test/')) return respond({});
     if (url.includes('api.notion.com/v1/databases/') && url.endsWith('/query')) return respond({ results: dbResults[url.split('/databases/')[1].split('/')[0]] || [] });
     if (url.includes('api.notion.com/v1/pages') && (opts.method === 'POST' || opts.method === 'PATCH')) return respond({ id: 'new' });
     if (url.includes('api.notion.com/v1/pages/')) return respond({ id: 'p', parent: { database_id: 'db-checkin' } });
@@ -32,13 +32,18 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   };
 
   const context = vm.createContext({ crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, Request, Response, URL, console, atob, btoa, fetch: fakeFetch, Date, JSON, Math, Promise });
+  vm.runInContext(`globalThis.__fakeNow = null; const _D = Date; globalThis.Date = class extends _D {
+    constructor(...a) { if (a.length === 0 && globalThis.__fakeNow !== null) super(globalThis.__fakeNow); else super(...a); }
+    static now() { return globalThis.__fakeNow !== null ? globalThis.__fakeNow : _D.now(); }
+  };`, context);
   vm.runInContext(fs.readFileSync(__dirname + '/dist/worker.js', 'utf8').replace('export default {', 'globalThis.worker = {'), context);
   const worker = context.worker;
 
   const env = {
     ACCESS_TEAM_DOMAIN: 'team.cloudflareaccess.com', ACCESS_AUD: 'aud-1', ALLOWED_EMAILS: 'sam@example.com,b@example.com,c@example.com', APPLICANTS: '甲,乙',
     HR_TOKEN: 't', CRM_TOKEN: 't2', DB_LEAVE: 'db-leave', DB_EXPENSE: 'db-exp', DB_CHECKIN: 'db-checkin', DB_CRM: 'db-crm',
-    LINE_CHANNEL_TOKEN: 'lt', LINE_CHANNEL_SECRET: 'line-secret', LINE_GROUP_ID: 'Cgroup',
+    LINE_CHANNEL_TOKEN: 'lt', LINE_CHANNEL_SECRET: 'line-secret', LINE_GROUP_ID: 'Cgroup', NOTIFY_KEY: 'nk-123',
+    LINE_NOTIFY_URL: 'https://line.test/api/line/notify',
   };
   const ctx = { waitUntil: p => { ctx.pending.push(p); }, pending: [] };
   const now = Math.floor(Date.now() / 1000);
@@ -85,14 +90,17 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   assert.equal(notionCalls(), before, 'Origin 不符不得寫入');
 
   // 請假：成功寫入 + LINE 通知
-  const lineBefore = calls.filter(c => c.url.includes('line.me')).length;
+  const lineBefore = calls.filter(c => c.url.startsWith('https://line.test/')).length;
   const ok = await call('/api/leave', { jwt: good, method: 'POST', body: leaveBody, origin });
   assert.equal(ok.status, 200, await ok.clone().text());
   await Promise.all(ctx.pending);
   const created = calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).pop();
   assert.ok(created, '請假應建立 Notion 頁面');
   assert.match(created.body, /已登記/);
-  assert.equal(calls.filter(c => c.url.includes('line.me')).length, lineBefore + 1, '請假送出應推一則 LINE');
+  assert.equal(calls.filter(c => c.url.startsWith('https://line.test/')).length, lineBefore + 1, '請假送出應轉交 LINE Worker 發一則');
+  assert.equal(calls.filter(c => c.url.includes('api.line.me') && c.url.includes('/push')).length, 0, '網站 Worker 不得直接呼叫 LINE');
+  const fwd = calls.filter(c => c.url.startsWith('https://line.test/')).pop();
+  assert.equal(fwd.notifyKey, 'nk-123', '轉交時要帶共用密鑰');
 
   // 請假輸入驗證
   for (const bad of [{ ...leaveBody, name: '陌生人' }, { ...leaveBody, type: '亂寫' }, { ...leaveBody, end: '2026-11-01' }, { ...leaveBody, hours: 0 }, { ...leaveBody, hours: 481 }, { ...leaveBody, hours: 3.3 }, { ...leaveBody, start: '2026-11-02', end: '2026-11-02', hours: 9 }, { ...leaveBody, start: '2026-02-31' }]) {
@@ -100,15 +108,15 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   }
   // 以小時請假：3 小時 = 0.375 天，LINE 與 Notion 都要對得上
   const hBefore = calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).length;
-  const lBefore = calls.filter(c => c.url.includes('/message/push')).length;
+  const lBefore = calls.filter(c => c.url.startsWith('https://line.test/')).length;
   const hr = await call('/api/leave', { jwt: good, method: 'POST', origin, body: { name: '甲', type: '事假', start: '2026-11-04', end: '2026-11-04', hours: 3, reason: '' } });
   assert.equal(hr.status, 200, await hr.clone().text());
   await Promise.all(ctx.pending);
   const hCall = calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).pop();
   assert.equal(JSON.parse(hCall.body).properties['請假天數'].number, 0.375, '3 小時應寫成 0.375 天');
-  const hPush = calls.filter(c => c.url.includes('/message/push')).pop();
+  const hPush = calls.filter(c => c.url.startsWith('https://line.test/')).pop();
   assert.match(hPush.body, /3 小時/, 'LINE 要顯示小時');
-  assert.equal(calls.filter(c => c.url.includes('/message/push')).length, lBefore + 1);
+  assert.equal(calls.filter(c => c.url.startsWith('https://line.test/')).length, lBefore + 1);
   assert.equal(calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).length, hBefore + 1);
   console.log('PASS 請假');
 
@@ -202,12 +210,34 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   assert.equal((await worker.fetch(new Request(origin + '/api/home', { method: 'GET' }), lineEnv, ctx)).status, 404, 'LINE 專用 Worker 不提供 API');
   console.log('PASS LINE 簽章、群組、操作人');
 
-  // 每日通知只在 LINE Worker 發
-  const p0 = calls.filter(c => c.url.includes('/message/push')).length;
+  // 替網站發 LINE：沒密鑰或錯密鑰不得發；網站 Worker 不提供這個入口
+  const notifyCall = (key, text) => worker.fetch(new Request(origin + '/api/line/notify', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(key ? { 'X-Notify-Key': key } : {}) }, body: JSON.stringify({ text }) }), lineEnv, ctx);
+  const pushCount = () => calls.filter(c => c.url.includes('api.line.me') && c.url.includes('/push')).length;
+  let p1 = pushCount();
+  assert.equal((await notifyCall(null, 'x')).status, 401, '沒密鑰須 401');
+  assert.equal((await notifyCall('wrong', 'x')).status, 401, '錯密鑰須 401');
+  assert.equal(pushCount(), p1, '未授權不得發 LINE');
+  assert.equal((await notifyCall('nk-123', '')).status, 400, '空訊息須 400');
+  assert.equal((await notifyCall('nk-123', 'a'.repeat(4001))).status, 400, '過長須 400');
+  assert.equal((await notifyCall('nk-123', '測試通知')).status, 200);
+  assert.equal(pushCount(), p1 + 1, '正確密鑰應發一則');
+  assert.equal((await worker.fetch(new Request(origin + '/api/line/notify', { method: 'POST', body: '{}' }), env, ctx)).status, 401, '網站 Worker 不提供 notify（回 401 登入）');
+  console.log('PASS 替網站發 LINE');
+
+  // 每日通知只在 LINE Worker 發，而且只在台灣平日發
+  context.__fakeNow = Date.parse('2026-10-28T01:00:00Z'); // 週三 09:00（台灣）
+  p1 = pushCount();
   await worker.scheduled({}, env, ctx); await Promise.all(ctx.pending);
-  assert.equal(calls.filter(c => c.url.includes('/message/push')).length, p0, '員工用 Worker 不發每日通知');
+  assert.equal(pushCount(), p1, '網站 Worker 不發每日通知');
   await worker.scheduled({}, lineEnv, ctx); await Promise.all(ctx.pending);
-  assert.equal(calls.filter(c => c.url.includes('/message/push')).length, p0 + 1, 'LINE Worker 發每日通知');
+  assert.equal(pushCount(), p1 + 1, 'LINE Worker 平日發每日通知');
+  context.__fakeNow = Date.parse('2026-10-31T01:00:00Z'); // 週六
+  await worker.scheduled({}, lineEnv, ctx); await Promise.all(ctx.pending);
+  assert.equal(pushCount(), p1 + 1, '週六不發');
+  context.__fakeNow = Date.parse('2026-11-01T01:00:00Z'); // 週日
+  await worker.scheduled({}, lineEnv, ctx); await Promise.all(ctx.pending);
+  assert.equal(pushCount(), p1 + 1, '週日不發');
+  context.__fakeNow = null;
   console.log('PASS 每日通知');
 
   console.log('ALL PASS');

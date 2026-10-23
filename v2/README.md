@@ -27,36 +27,39 @@
 node v2/build.cjs && node v2/worker.test.cjs
 ```
 
-## 部署：同一個檔案部署兩次
+## 部署：同一個檔案部署成兩個 Worker
 
-| Worker | 用途 | 前面有 Cloudflare Access？ | 變數 MODE |
-|---|---|---|---|
-| `seed-hr` | 網站與 API，給 Sam 用 | 有，只放行 Sam 的 Google 信箱 | 不設 |
-| `seed-hr-line` | 只收 LINE 通知、發每日 09:00 請假通知 | 沒有（LINE 伺服器無法登入），靠簽章驗證 | `line` |
+| Worker | 用途 | 前面有 Cloudflare Access？ |
+|---|---|---|
+| `seed-house` | 網站與 API，給 Sam 用 | 有，只放行 Sam 的 Google 信箱 |
+| `hr-system123`（沿用舊 Worker） | 只負責 LINE：收通知並驗簽章、替網站發 LINE 訊息、每日 09:00 請假通知 | 沒有（LINE 伺服器無法登入），靠簽章與共用密鑰；環境變數 `MODE=line`，其他路徑一律 404 |
 
-原因：Access 是整個 Worker 一起擋，無法單獨放行 LINE 的通知網址。
+原因：Access 是整個 Worker 一起擋，無法單獨放行 LINE 的通知網址。LINE 金鑰與群組編號因此只放在 LINE Worker 一處，網站 Worker 不持有。網站要通知時，帶共用密鑰 `NOTIFY_KEY` 呼叫 LINE Worker 的 `/api/line/notify`，訊息內容由網站 Worker 自己組。
 
 ### 環境變數（在 Cloudflare 填，不寫進程式或對話）
 
-| 變數 | seed-hr | seed-hr-line |
+| 變數 | seed-house | hr-system123（LINE） |
 |---|---|---|
 | ACCESS_TEAM_DOMAIN、ACCESS_AUD、ALLOWED_EMAILS | 要 | 不用 |
 | APPLICANTS（可代填的人名，逗號分隔） | 要 | 不用 |
-| HR_TOKEN（Notion 整合） | 要 | 要 |
+| HR_TOKEN（Notion 整合） | 要 | 已有 |
 | CRM_TOKEN（只需讀取權限） | 要 | 不用 |
-| DB_LEAVE、DB_EXPENSE、DB_CHECKIN、DB_CRM | 要 | DB_LEAVE |
-| LINE_CHANNEL_TOKEN、LINE_GROUP_ID | 要 | 要 |
-| LINE_CHANNEL_SECRET | 不用 | 要 |
-| LINE_ALLOWED_USER_IDS（選填） | 不用 | 選填 |
-| MODE | 不設 | `line` |
+| DB_LEAVE | 要 | 已有 |
+| DB_EXPENSE、DB_CHECKIN、DB_CRM | 要 | 不用 |
+| LINE_NOTIFY_URL（LINE Worker 的 `/api/line/notify` 完整網址） | 要 | 不用 |
+| NOTIFY_KEY（兩邊要一樣） | 要 | 要（新增） |
+| LINE_CHANNEL_TOKEN、LINE_GROUP_ID | 不用 | 已有 |
+| LINE_CHANNEL_SECRET | 不用 | 要（新增） |
+| LINE_ALLOWED_USER_IDS | 不用 | 選填 |
+| MODE | 不設 | `line`（新增） |
 
-Cron 觸發器只設在 `seed-hr-line`：`0 1 * * 1-5`（UTC 01:00，台灣平日 09:00）。
+Cron 觸發器設在 `hr-system123`：`0 1 * * 1-5`（UTC 01:00，台灣平日 09:00）；程式內另會在台灣週末直接略過。
 
 ## 資安對應（2026-10-23 盤點）
 
 | 項目 | 做法 |
 |---|---|
-| R3 LINE 簽章 | 先用 channel secret 驗 `x-line-signature`，再核對群組與操作人；指令只查詢，不改資料 |
+| R3 LINE 簽章 | 先用 channel secret 驗 `x-line-signature`，再核對群組與操作人；指令只查詢，不改資料。`/api/line/notify` 需共用密鑰 |
 | R4 長效金鑰與代理過廣 | 無共用金鑰；Access 短期憑證，Worker 驗簽章、AUD、期限與信箱；無通用 Notion 代理，每個動作固定欄位與資料庫 |
 | R7 來源與 API 位址 | 網頁與 API 同一個網址，無可改的 API 位址；CSP 只允許自己 |
 | R9 發布 | 不從主分支自動發布；由 Sam 手動貼進 Cloudflare |

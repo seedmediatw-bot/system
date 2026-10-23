@@ -1,21 +1,27 @@
 /**
  * 種子 HR 系統 v2：單一 Cloudflare Worker（網頁 + API + LINE）
  *
- * 部署同一個檔案兩次：
- *   seed-hr       給 Sam 用。前面由 Cloudflare Access 擋住，只放行 Sam 的 Google 信箱。
- *   seed-hr-line  只收 LINE 通知、發每日通知。環境變數 MODE=line；其他路徑一律 404。
+ * 同一個檔案部署成兩個 Worker：
+ *   seed-house    網站與 API，給 Sam 用。前面由 Cloudflare Access 擋住，只放行 Sam 的 Google 信箱。
+ *   hr-system123  （沿用舊名）只負責 LINE：收通知並驗簽章、替網站發 LINE 訊息、每日通知。
+ *                 環境變數 MODE=line；其他路徑一律 404。LINE 金鑰與群組編號只放在這一個 Worker。
  *
- * 環境變數（皆在 Cloudflare 控制台填，不寫進程式）：
+ * seed-house 的環境變數：
  *   ACCESS_TEAM_DOMAIN  例如 xxx.cloudflareaccess.com
  *   ACCESS_AUD          Access 應用程式的 AUD 標籤
  *   ALLOWED_EMAILS      逗號分隔，允許使用網站的 Google 信箱（即使 Access 設錯也會再擋一次）
- *   APPLICANTS          逗號分隔，可代為填單的人名，例如「甲,乙」
+ *   APPLICANTS          逗號分隔，可代填的人名
  *   HR_TOKEN / CRM_TOKEN   Notion 整合金鑰（CRM 那把只需讀取權限）
  *   DB_LEAVE DB_EXPENSE DB_CHECKIN DB_CRM
- *   LINE_CHANNEL_TOKEN LINE_CHANNEL_SECRET LINE_GROUP_ID
+ *   LINE_NOTIFY_URL     LINE Worker 的 /api/line/notify 完整網址
+ *   NOTIFY_KEY          與 LINE Worker 相同的共用密鑰
+ *
+ * LINE Worker（MODE=line）的環境變數：
+ *   MODE=line  LINE_CHANNEL_TOKEN  LINE_CHANNEL_SECRET  LINE_GROUP_ID  NOTIFY_KEY
+ *   HR_TOKEN  DB_LEAVE（今日請假查詢用）
  *   LINE_ALLOWED_USER_IDS（選填，逗號分隔；有填就只接受這些人的指令）
  *
- * Cron（只設在 seed-hr-line）：UTC 01:00 週一到週五，即台灣 09:00 → 每日請假通知
+ * Cron（只設在 LINE Worker）：UTC 01:00 週一到週五，即台灣 09:00 → 每日請假通知
  */
 
 const ASSETS = /*ASSETS*/{}/*END_ASSETS*/;
@@ -150,15 +156,41 @@ const applicant = (v, env) => oneOf(typeof v === 'string' ? v.trim() : '', csv(e
 
 // ── LINE ─────────────────────────────────────────────────────
 
-async function linePush(env, text) {
+// 只有 LINE Worker（MODE=line）持有 LINE 金鑰與群組編號。網站 Worker 要通知時，
+// 帶共用密鑰呼叫 LINE Worker 的 /api/line/notify，由它發出；訊息內容由網站 Worker 自己組，瀏覽器無法指定。
+async function linePushDirect(env, text) {
   if (!env.LINE_CHANNEL_TOKEN || !env.LINE_GROUP_ID) return;
+  await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.LINE_CHANNEL_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: env.LINE_GROUP_ID, messages: [{ type: 'text', text: text.slice(0, 4900) }] }),
+  });
+}
+async function linePush(env, text) {
   try {
-    await fetch('https://api.line.me/v2/bot/message/push', {
+    if (env.MODE === 'line') return await linePushDirect(env, text);
+    if (!env.LINE_NOTIFY_URL || !env.NOTIFY_KEY) return;
+    await fetch(env.LINE_NOTIFY_URL, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + env.LINE_CHANNEL_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: env.LINE_GROUP_ID, messages: [{ type: 'text', text: text.slice(0, 4900) }] }),
+      headers: { 'Content-Type': 'application/json', 'X-Notify-Key': env.NOTIFY_KEY },
+      body: JSON.stringify({ text: text.slice(0, 4000) }),
     });
   } catch (_) { /* 通知失敗不影響記錄 */ }
+}
+function safeEqual(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (!a || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+async function handleLineNotify(request, env) {
+  if (!safeEqual(request.headers.get('X-Notify-Key'), env.NOTIFY_KEY)) throw new HttpError(401, '密鑰不正確');
+  const body = await request.json().catch(() => ({}));
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+  if (!text || text.length > 4000) throw new HttpError(400, '訊息內容不正確');
+  await linePushDirect(env, text);
+  return json({ ok: true });
 }
 async function lineReply(env, replyToken, text) {
   if (!env.LINE_CHANNEL_TOKEN || !replyToken) return;
@@ -479,6 +511,7 @@ export default {
     try {
       if (env.MODE === 'line') {
         if (url.pathname === '/api/line/webhook' && request.method === 'POST') return await handleLineWebhook(request, env, ctx);
+        if (url.pathname === '/api/line/notify' && request.method === 'POST') return await handleLineNotify(request, env);
         return new Response('Not found', { status: 404, headers: SECURITY_HEADERS });
       }
       if (url.pathname.startsWith('/api/')) return await api(request, env, ctx, url);
@@ -497,6 +530,8 @@ export default {
 
   async scheduled(event, env, ctx) {
     if (env.MODE !== 'line') return;
+    const dow = new Date(Date.now() + 8 * 3600e3).getUTCDay();
+    if (dow === 0 || dow === 6) return;
     ctx.waitUntil(dailyNotice(env));
   },
 };
