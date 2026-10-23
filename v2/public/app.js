@@ -53,32 +53,6 @@
   // 儲存上次選的申請人（瀏覽器可能禁用儲存，失敗就算了）
   function remember(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
 
-  // ── 圖示：7×7 點陣，亮點是符號，暗點是底格 ───────────────────
-  var ICONS = {
-    home: ['...#...', '..###..', '.#####.', '.#####.', '.##.##.', '.##.##.', '.#####.'],
-    expense: ['.#####.', '.#...#.', '.#.#.#.', '.#...#.', '.#.#.#.', '.#...#.', '.#.#.#.'],
-    leave: ['.#...#.', '#######', '#.....#', '#.#.#.#', '#.....#', '#.#.#.#', '#######'],
-    checkin: ['.#####.', '#..#..#', '#..#..#', '#..##.#', '#.....#', '#.....#', '.#####.'],
-    clients: ['..###..', '..#.#..', '#######', '#.....#', '#.###.#', '#.....#', '#######']
-  };
-  var SVGNS = 'http://www.w3.org/2000/svg';
-  function icon(name) {
-    var svg = document.createElementNS(SVGNS, 'svg');
-    svg.setAttribute('viewBox', '0 0 28 28');
-    svg.setAttribute('aria-hidden', 'true');
-    ICONS[name].forEach(function (row, y) {
-      for (var x = 0; x < 7; x++) {
-        var c = document.createElementNS(SVGNS, 'circle');
-        c.setAttribute('cx', x * 4 + 2);
-        c.setAttribute('cy', y * 4 + 2);
-        c.setAttribute('r', row[x] === '#' ? 1.5 : 0.9);
-        c.setAttribute('class', row[x] === '#' ? 'dot on' : 'dot');
-        svg.appendChild(c);
-      }
-    });
-    return svg;
-  }
-
   // ── 全域狀態 ────────────────────────────────────────────────
   var config = { applicants: [], leaveTypes: [], expenseCats: [] };
   var PAGES = [
@@ -90,14 +64,18 @@
   ];
   var main = $('main');
 
+  // 選單只建一次，換頁時只更新目前頁面；這樣圖示的形變節奏不會因換頁重來
   function renderNav(current) {
     var nav = $('nav');
-    nav.textContent = '';
-    nav.appendChild(h('div', { class: 'brand' }, h('img', { src: '/favicon.svg', alt: '' }), '種子 內部系統'));
-    PAGES.forEach(function (p) {
-      var a = h('a', { href: '#' + p.id }, icon(p.id), h('span', { text: p.label }));
-      if (p.id === current) a.setAttribute('aria-current', 'page');
-      nav.appendChild(a);
+    if (!nav.firstChild) {
+      nav.appendChild(h('div', { class: 'brand' }, h('img', { src: '/favicon.svg', alt: '' }), '種子 內部系統'));
+      PAGES.forEach(function (p) {
+        nav.appendChild(h('a', { href: '#' + p.id, 'data-page': p.id }, window.NavIcons.create(p.id), h('span', { text: p.label })));
+      });
+    }
+    nav.querySelectorAll('a').forEach(function (a) {
+      if (a.getAttribute('data-page') === current) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
     });
   }
 

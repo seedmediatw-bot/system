@@ -26,9 +26,7 @@ p { margin: 0 0 .75rem; }
 .brand { display: flex; align-items: center; gap: .6rem; padding: 0 .5rem 1.25rem; font-weight: 700; }
 .brand img { width: 28px; height: 28px; }
 .nav a { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border-radius: var(--radius); color: var(--ink); text-decoration: none; min-height: 44px; }
-.nav a svg { width: 32px; height: 32px; flex: none; }
-.dot { fill: #55524b; }
-.dot.on { fill: currentColor; }
+.navicon { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .nav a:hover { background: var(--surface2); }
 .nav a[aria-current="page"] { background: var(--surface2); color: var(--accent); }
 .nav .who { margin-top: 1.5rem; padding: .75rem .5rem 0; border-top: 1px solid var(--line); font-size: .85rem; color: var(--ink2); overflow-wrap: anywhere; }
