@@ -24,5 +24,10 @@ const call = (path,key,body) => context.worker.fetch(request(path,key,body),env)
   assert.equal((await call('/api/hr/databases/x/query',null,{})).status,401,'HR Notion 代理無金鑰須 401');
   assert.equal(upstreamCalls.length,nBefore,'未授權的 HR 代理不得呼叫上游');
   assert.equal((await call('/api/hr/databases/x/query',env.HR_ACCESS_KEY,{})).status,200,'HR Notion 代理有金鑰 200');
-  console.log('PASS: HR Gemini 驗證門（無金鑰/錯金鑰 401 且不呼叫上游、正確金鑰 200）、HR Notion 代理驗證未鬆動');
+  // R5: 收據代理需 HR 驗證 + ID 格式驗證
+  const rBefore=upstreamCalls.length;
+  assert.equal((await call('/api/hr/receipt?id=abcdefghij',null)).status,401,'收據代理無金鑰須 401');
+  assert.equal(upstreamCalls.length,rBefore,'未授權收據不得呼叫上游');
+  assert.equal((await call('/api/hr/receipt?id=bad!id',env.HR_ACCESS_KEY)).status,400,'有金鑰但 ID 非法須 400（已過驗證門）');
+  console.log('PASS: HR Gemini 驗證門（無金鑰/錯金鑰 401 且不呼叫上游、正確金鑰 200）、HR Notion 代理驗證未鬆動、收據代理 R5 驗證門與 ID 驗證');
 })().catch(e=>{console.error(e);process.exitCode=1;});

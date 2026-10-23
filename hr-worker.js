@@ -273,6 +273,7 @@ async function handleHR(request, env, pathname, origin) {
     return errResponse('Unauthorized Access', origin, 401);
   }
   if (pathname === '/api/hr/drive-upload') return handleDriveUpload(request, env, origin);
+  if (pathname === '/api/hr/receipt')      return handleReceipt(request, env, origin);
   if (pathname === '/api/hr/line/notify')   return handleLineNotify(request, env, origin);
   const notionPath = pathname.replace('/api/hr/', '');
   return notionProxy(request, env.HR_TOKEN, notionPath, origin);
@@ -304,6 +305,62 @@ async function handleGemini(request, env, origin) {
   }
 }
 
+// ── Google 服務帳號存取權杖 ───────────────────────────────────
+
+async function getGoogleAccessToken(env) {
+  const clientEmail = env.GOOGLE_CLIENT_EMAIL;
+  const privateKey = env.GOOGLE_PRIVATE_KEY;
+  const now = Math.floor(Date.now() / 1000);
+  const jwtHeader = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const jwtPayload = btoa(JSON.stringify({
+    iss: clientEmail, scope: 'https://www.googleapis.com/auth/drive.file',
+    aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
+  })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const signingInput = `${jwtHeader}.${jwtPayload}`;
+  const pemKey = privateKey.replace(/\\n/g,'\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/g,'').replace(/\s/g,'');
+  const keyBuffer = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBuffer, { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
+  const sigBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput));
+  const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuffer))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const jwt = `${signingInput}.${sig}`;
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+  });
+  const tokenData = await tokenRes.json();
+  return tokenData.access_token;
+}
+
+// ── 收據讀取代理（R5：私有 Drive 檔，需 HR 驗證）──────────────
+// 收據不再公開。由本端點以服務帳號讀取私有檔案串流回前端，
+// 前端用帶 X-Access-Key 的 fetch 取得後以 blob 顯示。驗證已在 handleHR 完成。
+
+async function handleReceipt(request, env, origin) {
+  try {
+    const id = new URL(request.url).searchParams.get('id') || '';
+    if (!/^[A-Za-z0-9_-]{10,100}$/.test(id)) return errResponse('無效的收據 ID', origin, 400);
+    if (!env.GOOGLE_CLIENT_EMAIL || !env.GOOGLE_PRIVATE_KEY) {
+      return errResponse('Google Drive 環境變數未設定', origin, 500);
+    }
+    const accessToken = await getGoogleAccessToken(env);
+    if (!accessToken) return errResponse('Google 認證失敗', origin, 500);
+    const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (!fileRes.ok) return errResponse('收據讀取失敗', origin, fileRes.status);
+    return new Response(fileRes.body, {
+      status: 200,
+      headers: {
+        ...corsHeaders(origin),
+        'Content-Type': fileRes.headers.get('Content-Type') || 'application/octet-stream',
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (e) {
+    return errResponse('收據讀取錯誤: ' + e.message, origin, 500);
+  }
+}
+
 // ── Google Drive 上傳 ─────────────────────────────────────────
 
 async function handleDriveUpload(request, env, origin) {
@@ -315,25 +372,8 @@ async function handleDriveUpload(request, env, origin) {
       return errResponse('Google Drive 環境變數未設定', origin, 500);
     }
     const { base64, mimeType, filename } = await request.json();
-    const now = Math.floor(Date.now() / 1000);
-    const jwtHeader = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-    const jwtPayload = btoa(JSON.stringify({
-      iss: clientEmail, scope: 'https://www.googleapis.com/auth/drive.file',
-      aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
-    })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-    const signingInput = `${jwtHeader}.${jwtPayload}`;
-    const pemKey = privateKey.replace(/\\n/g,'\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----/g,'').replace(/\s/g,'');
-    const keyBuffer = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
-    const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBuffer, { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
-    const sigBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput));
-    const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuffer))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-    const jwt = `${signingInput}.${sig}`;
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
-    });
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) return errResponse('Google 認證失敗', origin, 500);
+    const accessToken = await getGoogleAccessToken(env);
+    if (!accessToken) return errResponse('Google 認證失敗', origin, 500);
     const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
     const meta = JSON.stringify({ name: filename || 'receipt.jpg', parents: [folderId] });
     const boundary = 'drive_boundary_hr';
@@ -349,7 +389,7 @@ async function handleDriveUpload(request, env, origin) {
     body.set(p2e, off);
     const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary="${boundary}"` },
       body
     });
     if (!uploadRes.ok) {
@@ -357,12 +397,9 @@ async function handleDriveUpload(request, env, origin) {
       return errResponse('Drive 上傳失敗: ' + errText.slice(0, 100), origin, 500);
     }
     const fileData = await uploadRes.json();
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: 'reader', type: 'anyone' })
-    });
-    return okResponse({ url: `https://drive.google.com/uc?export=view&id=${fileData.id}`, id: fileData.id }, origin);
+    // R5：不再設定 anyone 公開權限；收據維持私有，改由 /api/hr/receipt 代理讀取。
+    const proxyUrl = new URL(request.url).origin + '/api/hr/receipt?id=' + fileData.id;
+    return okResponse({ url: proxyUrl, id: fileData.id }, origin);
   } catch (e) {
     return errResponse('Drive 上傳錯誤: ' + e.message, origin, 500);
   }
