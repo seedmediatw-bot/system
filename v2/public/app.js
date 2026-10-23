@@ -131,7 +131,7 @@
       body.appendChild(h('h2', { text: '今天（' + d.today + '）請假' }));
       body.appendChild(d.todayLeaves.length
         ? h('div', { class: 'list' }, d.todayLeaves.map(function (x) {
-          return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: x.type + (x.days ? ' ' + x.days + ' 天' : '') }));
+          return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: x.type + (x.days ? ' ' + fmtLeave(x.days) : '') }));
         }))
         : h('p', { class: 'empty', text: '今天沒有人請假。' }));
 
@@ -144,10 +144,10 @@
           h('button', { class: 'btn ghost small', type: 'button', text: '上個月', onclick: function () { go('home', ym(prev)); } }), ' ',
           h('button', { class: 'btn ghost small', type: 'button', text: '下個月', onclick: function () { go('home', ym(next)); } }))));
 
-      body.appendChild(h('h2', { text: '誰請了幾天假' }));
+      body.appendChild(h('h2', { text: '誰請了多少假' }));
       body.appendChild(d.leaveByPerson.length
         ? h('div', { class: 'list' }, d.leaveByPerson.map(function (x) {
-          return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: x.days + ' 天（' + x.count + ' 筆）' }));
+          return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: fmtLeave(x.days) + '（' + x.count + ' 筆）' }));
         }))
         : h('p', { class: 'empty', text: '這個月沒有請假紀錄。' }));
 
@@ -231,7 +231,12 @@
     }).catch(function (e) { box.textContent = ''; box.appendChild(h('p', { class: 'err', text: e.message })); });
   }
 
-  // ── 請假 ────────────────────────────────────────────────────
+  // ── 請假（以小時為單位；每天 8 小時）─────────────────────────
+  function fmtLeave(days) {
+    var hours = Math.round(Number(days || 0) * 16) / 2;
+    var d = Math.floor(hours / 8), r = hours - d * 8;
+    return [d ? d + ' 天' : '', r ? r + ' 小時' : ''].filter(Boolean).join(' ') || '0 小時';
+  }
   function weekdaysBetween(a, b) {
     if (!a || !b || b < a) return 0;
     var d = new Date(a + 'T00:00:00'), end = new Date(b + 'T00:00:00'), n = 0;
@@ -240,22 +245,36 @@
   }
   function pageLeave() {
     main.appendChild(h('h1', { text: '請假' }));
-    main.appendChild(h('p', { class: 'muted', text: '送出後記到 Notion，LINE 群組會收到通知。只登記，不審核。' }));
+    main.appendChild(h('p', { class: 'muted', text: '以小時計，一天 8 小時。送出後記到 Notion，LINE 群組會收到通知，只登記不審核。' }));
     var typeBox = h('div', { class: 'segment', role: 'radiogroup', 'aria-label': '假別' });
     config.leaveTypes.forEach(function (t, i) {
       typeBox.appendChild(h('label', {}, h('input', { type: 'radio', name: 'f-type', value: t, checked: i === 0 }), h('span', { text: t })));
     });
     var start = h('input', { type: 'date', id: 'f-start', value: todayStr(), required: true });
     var end = h('input', { type: 'date', id: 'f-end', value: todayStr(), required: true });
-    var days = h('input', { type: 'number', id: 'f-days', min: '0.5', max: '60', step: '0.5', required: true, value: '1' });
-    var half = h('select', { id: 'f-half' }, h('option', { value: '0', text: '整天' }), h('option', { value: '0.5', text: '只請半天' }));
-    function calc() {
-      var n = weekdaysBetween(start.value, end.value);
-      if (half.value === '0.5' && n >= 1) n = n - 0.5;
-      days.value = n || 1;
+    var hours = h('input', { type: 'number', id: 'f-hours', min: '0.5', max: '480', step: '0.5', required: true, value: '8' });
+    var summary = h('p', { class: 'muted' });
+    var chipBox = h('div', { class: 'segment', role: 'radiogroup', 'aria-label': '請假時數' });
+    [1, 2, 3, 4, 5, 6, 7, 8].forEach(function (n) {
+      chipBox.appendChild(h('label', {}, h('input', { type: 'radio', name: 'f-chip', value: String(n), checked: n === 8, onchange: function () { hours.value = String(n); sync(); } }), h('span', { text: n === 8 ? '整天 8' : n + ' 小時' })));
+    });
+    function multiDay() { return end.value > start.value; }
+    function sync() {
+      chipBox.hidden = multiDay();
+      var n = Number(hours.value) || 0;
+      summary.textContent = multiDay()
+        ? '跨 ' + weekdaysBetween(start.value, end.value) + ' 個上班日，預設每天 8 小時；週末不算，可直接改合計小時。合計 ' + fmtLeave(n / 8) + '。'
+        : '合計 ' + fmtLeave(n / 8) + '。';
     }
-    [start, end, half].forEach(function (el) { el.addEventListener('change', calc); });
-    start.addEventListener('change', function () { if (end.value < start.value) end.value = start.value; calc(); });
+    function dates() {
+      if (end.value < start.value) end.value = start.value;
+      if (multiDay()) hours.value = String((weekdaysBetween(start.value, end.value) || 1) * 8);
+      else { var c = chipBox.querySelector('input:checked'); hours.value = c ? c.value : '8'; }
+      sync();
+    }
+    start.addEventListener('change', dates);
+    end.addEventListener('change', dates);
+    hours.addEventListener('input', sync);
     var reason = h('textarea', { id: 'f-reason', maxlength: '500' });
     var submit = h('button', { class: 'btn', type: 'submit', text: '送出請假' });
     var form = h('form', {},
@@ -264,23 +283,23 @@
       h('div', { class: 'row2' },
         h('div', { class: 'field' }, h('label', { for: 'f-start', text: '開始日期' }), start),
         h('div', { class: 'field' }, h('label', { for: 'f-end', text: '結束日期' }), end)),
-      h('div', { class: 'row2' },
-        h('div', { class: 'field' }, h('label', { for: 'f-half', text: '半天' }), half),
-        h('div', { class: 'field' }, h('label', { for: 'f-days', text: '天數（週末不算，可手動改）' }), days)),
+      h('div', { class: 'field' }, h('label', { text: '請假時數' }), chipBox),
+      h('div', { class: 'field' }, h('label', { for: 'f-hours', text: '合計小時（最小 0.5）' }), hours, summary),
       h('div', { class: 'field' }, h('label', { for: 'f-reason', text: '原因（選填）' }), reason),
       submit);
+    sync();
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       submitWith(submit, function () {
         return api('POST', '/api/leave', {
           name: $('f-name').value, type: form.querySelector('input[name="f-type"]:checked').value,
-          start: start.value, end: end.value, days: days.value, reason: reason.value
+          start: start.value, end: end.value, hours: hours.value, reason: reason.value
         }).then(function () { toast('請假已送出，LINE 已通知'); go('leave'); });
       });
     });
     main.appendChild(form);
     recentList('/api/leave', '最近的請假', function (x) {
-      return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name + '　' + x.type + ' ' + x.days + ' 天' }), h('span', { class: 'muted', text: x.start }),
+      return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name + '　' + x.type + ' ' + fmtLeave(x.days) }), h('span', { class: 'muted', text: x.start }),
         h('span', { class: 'sub', text: x.start + ' ～ ' + x.end + (x.reason ? '　' + x.reason : '') }));
     });
   }

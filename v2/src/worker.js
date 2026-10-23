@@ -189,7 +189,13 @@ async function leaveOn(env, date) {
   });
   return rows.map(r => ({ name: getText(r.properties, '姓名') || '未知', type: getSel(r.properties, '假別'), days: getNum(r.properties, '請假天數') }));
 }
-const leaveLines = list => list.map(x => `• ${x.name}　${x.type}${x.days ? '　' + x.days + '天' : ''}`).join('\n');
+// 請假以小時為單位；Notion 的「請假天數」欄存「小時 ÷ 8」，顯示時換回「N 天 M 小時」
+const fmtLeave = days => {
+  const hours = Math.round(Number(days || 0) * 16) / 2;
+  const d = Math.floor(hours / 8), r = hours - d * 8;
+  return [d ? d + ' 天' : '', r ? r + ' 小時' : ''].filter(Boolean).join(' ') || '0 小時';
+};
+const leaveLines = list => list.map(x => `• ${x.name}　${x.type}${x.days ? '　' + fmtLeave(x.days) : ''}`).join('\n');
 
 async function dailyNotice(env) {
   const today = twToday();
@@ -338,7 +344,7 @@ async function api(request, env, ctx, url) {
     for (const r of leaves) {
       const n = getText(r.properties, '姓名') || '未知', d = getNum(r.properties, '請假天數') || 0;
       (leaveBy[n] = leaveBy[n] || { name: n, days: 0, count: 0 }).days += d; leaveBy[n].count++;
-      entries.push({ kind: '請假', name: n, text: `${getSel(r.properties, '假別')} ${d} 天`, date: getDate(r.properties, '開始日期'), at: r.created_time });
+      entries.push({ kind: '請假', name: n, text: `${getSel(r.properties, '假別')} ${fmtLeave(d)}`, date: getDate(r.properties, '開始日期'), at: r.created_time });
     }
     for (const r of expenses) {
       const n = getText(r.properties, '姓名') || '未知', t = getNum(r.properties, '合計金額') || 0;
@@ -358,14 +364,18 @@ async function api(request, env, ctx, url) {
       const name = applicant(body.name, env);
       const type = oneOf(body.type, LEAVE_TYPES, '假別');
       if (!isDate(body.start) || !isDate(body.end) || body.end < body.start) throw new HttpError(400, '日期不正確');
-      const days = num(body.days, 0.5, 60, '天數');
+      const hours = num(body.hours, 0.5, 480, '請假時數');
+      if (hours * 2 !== Math.round(hours * 2)) throw new HttpError(400, '請假時數最小單位是 0.5 小時');
+      const spanDays = Math.round((new Date(body.end + 'T00:00:00Z') - new Date(body.start + 'T00:00:00Z')) / 86400e3) + 1;
+      if (hours > spanDays * 8) throw new HttpError(400, '請假時數超過日期範圍（每天最多 8 小時）');
+      const days = Math.round(hours / 8 * 1000) / 1000;
       const reason = str(body.reason, 500, false, '原因');
       await notion(env.HR_TOKEN, 'POST', 'pages', { parent: { database_id: env.DB_LEAVE }, properties: {
         '申請編號': { title: rt(newCode('REQ')) }, '姓名': { rich_text: rt(name) }, '假別': { select: { name: type } },
         '開始日期': { date: { start: body.start } }, '結束日期': { date: { start: body.end } },
         '請假天數': { number: days }, '請假原因': { rich_text: rt(reason) }, '審核狀態': { select: { name: '已登記' } },
       } });
-      ctx.waitUntil(linePush(env, `📋 新請假\n${name}　${type}\n${body.start} ～ ${body.end}（${days} 天）${reason ? '\n原因：' + reason : ''}`));
+      ctx.waitUntil(linePush(env, `📋 新請假\n${name}　${type}\n${body.start} ～ ${body.end}（${fmtLeave(days)}）${reason ? '\n原因：' + reason : ''}`));
       return json({ ok: true });
     }
   }

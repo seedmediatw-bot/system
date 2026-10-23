@@ -36,14 +36,14 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   const worker = context.worker;
 
   const env = {
-    ACCESS_TEAM_DOMAIN: 'team.cloudflareaccess.com', ACCESS_AUD: 'aud-1', ALLOWED_EMAILS: 'sam@example.com', APPLICANTS: '甲,乙',
+    ACCESS_TEAM_DOMAIN: 'team.cloudflareaccess.com', ACCESS_AUD: 'aud-1', ALLOWED_EMAILS: 'sam@example.com,b@example.com,c@example.com', APPLICANTS: '甲,乙',
     HR_TOKEN: 't', CRM_TOKEN: 't2', DB_LEAVE: 'db-leave', DB_EXPENSE: 'db-exp', DB_CHECKIN: 'db-checkin', DB_CRM: 'db-crm',
     LINE_CHANNEL_TOKEN: 'lt', LINE_CHANNEL_SECRET: 'line-secret', LINE_GROUP_ID: 'Cgroup',
   };
   const ctx = { waitUntil: p => { ctx.pending.push(p); }, pending: [] };
   const now = Math.floor(Date.now() / 1000);
   const goodClaims = { aud: ['aud-1'], iss: 'https://team.cloudflareaccess.com', exp: now + 600, email: 'sam@example.com' };
-  const good = await sign(goodClaims);
+  let good = await sign(goodClaims);
   const origin = 'https://hr.test';
   const req = (path, { jwt, method = 'GET', body, origin: o } = {}) => new Request(origin + path, {
     method, headers: { 'Content-Type': 'application/json', ...(jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {}), ...(o ? { Origin: o } : {}) },
@@ -78,7 +78,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   assert.deepEqual(cfg.applicants, ['甲', '乙']);
 
   // 寫入：缺 Origin、錯 Origin 被擋
-  const leaveBody = { name: '甲', type: '特休', start: '2026-11-02', end: '2026-11-03', days: 2, reason: '測試' };
+  const leaveBody = { name: '甲', type: '特休', start: '2026-11-02', end: '2026-11-03', hours: 16, reason: '測試' };
   before = notionCalls();
   assert.equal((await call('/api/leave', { jwt: good, method: 'POST', body: leaveBody })).status, 403, '缺 Origin 須 403');
   assert.equal((await call('/api/leave', { jwt: good, method: 'POST', body: leaveBody, origin: 'https://evil.example.com' })).status, 403, '錯 Origin 須 403');
@@ -95,9 +95,21 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   assert.equal(calls.filter(c => c.url.includes('line.me')).length, lineBefore + 1, '請假送出應推一則 LINE');
 
   // 請假輸入驗證
-  for (const bad of [{ ...leaveBody, name: '陌生人' }, { ...leaveBody, type: '亂寫' }, { ...leaveBody, end: '2026-11-01' }, { ...leaveBody, days: 0 }, { ...leaveBody, start: '2026-02-31' }]) {
+  for (const bad of [{ ...leaveBody, name: '陌生人' }, { ...leaveBody, type: '亂寫' }, { ...leaveBody, end: '2026-11-01' }, { ...leaveBody, hours: 0 }, { ...leaveBody, hours: 481 }, { ...leaveBody, hours: 3.3 }, { ...leaveBody, start: '2026-11-02', end: '2026-11-02', hours: 9 }, { ...leaveBody, start: '2026-02-31' }]) {
     assert.equal((await call('/api/leave', { jwt: good, method: 'POST', body: bad, origin })).status, 400, '壞資料須 400：' + JSON.stringify(bad));
   }
+  // 以小時請假：3 小時 = 0.375 天，LINE 與 Notion 都要對得上
+  const hBefore = calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).length;
+  const lBefore = calls.filter(c => c.url.includes('/message/push')).length;
+  const hr = await call('/api/leave', { jwt: good, method: 'POST', origin, body: { name: '甲', type: '事假', start: '2026-11-04', end: '2026-11-04', hours: 3, reason: '' } });
+  assert.equal(hr.status, 200, await hr.clone().text());
+  await Promise.all(ctx.pending);
+  const hCall = calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).pop();
+  assert.equal(JSON.parse(hCall.body).properties['請假天數'].number, 0.375, '3 小時應寫成 0.375 天');
+  const hPush = calls.filter(c => c.url.includes('/message/push')).pop();
+  assert.match(hPush.body, /3 小時/, 'LINE 要顯示小時');
+  assert.equal(calls.filter(c => c.url.includes('/message/push')).length, lBefore + 1);
+  assert.equal(calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).length, hBefore + 1);
   console.log('PASS 請假');
 
   // 報帳：總額由伺服器算，並通知
@@ -118,6 +130,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   console.log('PASS 簽到');
 
 
+  good = await sign({ ...goodClaims, email: 'b@example.com' }); // 換一個帳號，避開寫入節流
   // 全月正常出勤：週末、國定假日、請假日、已簽到日都不預設勾選
   dbResults['db-leave'] = [{ properties: { '開始日期': { date: { start: '2026-10-14' } }, '結束日期': { date: { start: '2026-10-15' } } } }];
   dbResults['db-checkin'] = [{ properties: { '日期': { date: { start: '2026-10-05' } } } }];
@@ -148,6 +161,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   dbResults['db-leave'] = []; dbResults['db-checkin'] = [];
   console.log('PASS 全月正常出勤');
 
+  good = await sign({ ...goodClaims, email: 'c@example.com' });
   // 寫入節流
   let last;
   for (let i = 0; i < 25; i++) last = await call('/api/checkin/12345678123412341234123456789012', { jwt: good, method: 'PATCH', origin, body: { date: '2026-11-02', clockIn: '09:00' } });
