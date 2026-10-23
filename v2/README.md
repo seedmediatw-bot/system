@@ -29,18 +29,31 @@ node v2/build.cjs && node v2/worker.test.cjs
 
 ## 部署：同一個檔案部署成兩個 Worker
 
-| Worker | 用途 | 前面有 Cloudflare Access？ |
+| Worker | 用途 | 怎麼擋人 |
 |---|---|---|
-| `seed-house` | 網站與 API，給 Sam 用 | 有，只放行 Sam 的 Google 信箱 |
-| `hr-system123`（沿用舊 Worker） | 只負責 LINE：收通知並驗簽章、替網站發 LINE 訊息、每日 09:00 請假通知 | 沒有（LINE 伺服器無法登入），靠簽章與共用密鑰；環境變數 `MODE=line`，其他路徑一律 404 |
+| `seed-house` | 網站與 API，給 Sam 用 | 網站自己做 Google 登入，只有 `ALLOWED_EMAILS` 內的信箱進得來 |
+| `hr-system123`（沿用舊 Worker） | 只負責 LINE：收通知並驗簽章、替網站發 LINE 訊息、每日 09:00 請假通知 | LINE 簽章與共用密鑰；環境變數 `MODE=line`，其他路徑一律 404 |
 
-原因：Access 是整個 Worker 一起擋，無法單獨放行 LINE 的通知網址。LINE 金鑰與群組編號因此只放在 LINE Worker 一處，網站 Worker 不持有。網站要通知時，帶共用密鑰 `NOTIFY_KEY` 呼叫 LINE Worker 的 `/api/line/notify`，訊息內容由網站 Worker 自己組。
+LINE 金鑰與群組編號只放在 LINE Worker 一處，網站 Worker 不持有。網站要通知時，帶共用密鑰 `NOTIFY_KEY` 呼叫 LINE Worker 的 `/api/line/notify`，訊息內容由網站 Worker 自己組。
+
+### 登入怎麼運作
+
+1. 打開網站，未登入會被導到 `/auth/login`，再轉到 Google 選帳號（OpenID Connect，授權碼流程加 PKCE、state、nonce）。
+2. Google 回到 `/auth/callback`，Worker 驗證 Google 簽發的身分憑證（簽章、發行者、`aud`、期限、nonce、信箱已驗證），信箱在 `ALLOWED_EMAILS` 內才發工作階段。
+3. 工作階段是簽章 Cookie（HttpOnly、Secure、SameSite=Lax），8 小時到期。
+4. 撤銷：從 `ALLOWED_EMAILS` 移除信箱，下一次請求立刻失效；改掉 `SESSION_SECRET` 則所有人立刻登出。
+5. 登入入口對同一來源限流（每分鐘 20 次）；密碼由 Google 負責，不在我們這裡。
+
+Google 端的設定：在 Google Cloud 建立 OAuth 用戶端（網頁應用程式），授權的重新導向 URI 填 `https://<網站網址>/auth/callback`，範圍只用 `openid` 與 `email`。
 
 ### 環境變數（在 Cloudflare 填，不寫進程式或對話）
 
 | 變數 | seed-house | hr-system123（LINE） |
 |---|---|---|
-| ACCESS_TEAM_DOMAIN、ACCESS_AUD、ALLOWED_EMAILS | 要 | 不用 |
+| GOOGLE_CLIENT_ID | 要（文字） | 不用 |
+| GOOGLE_CLIENT_SECRET | 要（Secret） | 不用 |
+| SESSION_SECRET（至少 32 字元的隨機字串） | 要（Secret） | 不用 |
+| ALLOWED_EMAILS | 要 | 不用 |
 | APPLICANTS（可代填的人名，逗號分隔） | 要 | 不用 |
 | HR_TOKEN（Notion 整合） | 要 | 已有 |
 | CRM_TOKEN（只需讀取權限） | 要 | 不用 |
@@ -60,15 +73,16 @@ Cron 觸發器設在 `hr-system123`：`0 1 * * 1-5`（UTC 01:00，台灣平日 0
 | 項目 | 做法 |
 |---|---|
 | R3 LINE 簽章 | 先用 channel secret 驗 `x-line-signature`，再核對群組與操作人；指令只查詢，不改資料。`/api/line/notify` 需共用密鑰 |
-| R4 長效金鑰與代理過廣 | 無共用金鑰；Access 短期憑證，Worker 驗簽章、AUD、期限與信箱；無通用 Notion 代理，每個動作固定欄位與資料庫 |
+| R4 長效金鑰與代理過廣 | 無共用金鑰；Google 登入後的短期簽章 Cookie（8 小時），可從名單撤銷；無通用 Notion 代理，每個動作固定欄位與資料庫 |
 | R7 來源與 API 位址 | 網頁與 API 同一個網址，無可改的 API 位址；CSP 只允許自己 |
 | R9 發布 | 不從主分支自動發布；由 Sam 手動貼進 Cloudflare |
-| 登入節流 | 登入由 Access 負責；寫入每分鐘上限 20 次（單一執行個體內計算，非全球計數） |
+| 登入節流 | 登入入口每分鐘 20 次；寫入每分鐘 20 次（單一執行個體內計算，非全球計數） |
 | 收據 | 不再收收據，移除 Google Drive 服務帳號用途 |
 
 ## 已知限制
 
 - 寫入節流只在單一 Worker 執行個體內計算。要更嚴格需另設 Cloudflare 速率限制規則。
 - `LINE_ALLOWED_USER_IDS` 不填時，群組內任何人 @Bot 都可查詢請假（群組本身已核對）。
-- Notion 欄位名稱依舊系統原始碼，部署前要對照實際資料庫。
+- Notion 欄位名稱已於 2026-10-23 對照實際資料庫（請假、報帳、簽到、客戶）。客戶資料庫已沒有「潛在客戶狀態」等舊欄位，程式讀不到時留空。
+- 手機版沒有登出按鈕（登入 8 小時自動到期）。
 - 請假與報帳的「審核狀態」欄會寫入「已登記」，Notion 若有依此欄位的檢視要留意。

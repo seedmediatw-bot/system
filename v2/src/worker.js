@@ -2,14 +2,14 @@
  * 種子 HR 系統 v2：單一 Cloudflare Worker（網頁 + API + LINE）
  *
  * 同一個檔案部署成兩個 Worker：
- *   seed-house    網站與 API，給 Sam 用。前面由 Cloudflare Access 擋住，只放行 Sam 的 Google 信箱。
+ *   seed-house    網站與 API，給 Sam 用。用 Google 登入，只有 ALLOWED_EMAILS 內的信箱進得來。
  *   hr-system123  （沿用舊名）只負責 LINE：收通知並驗簽章、替網站發 LINE 訊息、每日通知。
  *                 環境變數 MODE=line；其他路徑一律 404。LINE 金鑰與群組編號只放在這一個 Worker。
  *
  * seed-house 的環境變數：
- *   ACCESS_TEAM_DOMAIN  例如 xxx.cloudflareaccess.com
- *   ACCESS_AUD          Access 應用程式的 AUD 標籤
- *   ALLOWED_EMAILS      逗號分隔，允許使用網站的 Google 信箱（即使 Access 設錯也會再擋一次）
+ *   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET   Google Cloud 的 OAuth 用戶端
+ *   SESSION_SECRET      至少 32 字元的隨機字串，用來簽登入 Cookie；換掉它就是全部登出
+ *   ALLOWED_EMAILS      逗號分隔，允許使用網站的 Google 信箱；每次請求都會核對
  *   APPLICANTS          逗號分隔，可代填的人名
  *   HR_TOKEN / CRM_TOKEN   Notion 整合金鑰（CRM 那把只需讀取權限）
  *   DB_LEAVE DB_EXPENSE DB_CHECKIN DB_CRM
@@ -47,55 +47,152 @@ function json(data, status = 200) {
 }
 const csv = value => String(value || '').split(',').map(s => s.trim()).filter(Boolean);
 
-// ── Cloudflare Access 憑證驗證 ────────────────────────────────
+// ── 登入：Google 登入（OpenID Connect + PKCE）＋簽章 Cookie 工作階段 ──────
+// 流程：/auth/login 導向 Google → /auth/callback 換取並驗證 id_token → 只有 ALLOWED_EMAILS 內的信箱
+// 拿得到 8 小時的工作階段 Cookie。每次請求都會重新核對信箱名單，所以從名單移除信箱即刻失效；
+// 換掉 SESSION_SECRET 則所有人的登入立刻全部失效。
+
+const SESSION_COOKIE = 'seed_session';
+const OAUTH_COOKIE = 'seed_oauth';
+const SESSION_TTL_SECONDS = 8 * 3600;
+const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
+const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 
 const b64uToBytes = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const b64uToJson = s => JSON.parse(new TextDecoder().decode(b64uToBytes(s)));
-let jwksCache = { at: 0, keys: null, team: '' };
+const bytesToB64u = bytes => {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const strToB64u = s => bytesToB64u(new TextEncoder().encode(s));
+const randomB64u = n => bytesToB64u(crypto.getRandomValues(new Uint8Array(n)));
+const nowSec = () => Math.floor(Date.now() / 1000);
 
-async function loadJwks(env) {
-  const now = Date.now();
-  if (jwksCache.keys && jwksCache.team === env.ACCESS_TEAM_DOMAIN && now - jwksCache.at < 3600e3) return jwksCache.keys;
-  const res = await fetch(`https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`);
-  if (!res.ok) throw new HttpError(503, '登入服務暫時無法驗證');
-  const data = await res.json();
-  jwksCache = { at: now, keys: data.keys || [], team: env.ACCESS_TEAM_DOMAIN };
-  return jwksCache.keys;
+function authConfigured(env) {
+  return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && String(env.SESSION_SECRET || '').length >= 32 && csv(env.ALLOWED_EMAILS).length);
+}
+
+async function hmacB64u(env, data) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.SESSION_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return bytesToB64u(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data))));
+}
+async function signToken(env, obj) {
+  const payload = strToB64u(JSON.stringify(obj));
+  return payload + '.' + await hmacB64u(env, payload);
+}
+async function readToken(env, token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  if (!safeEqual(await hmacB64u(env, parts[0]), parts[1])) return null;
+  try {
+    const obj = b64uToJson(parts[0]);
+    return obj && obj.exp > nowSec() ? obj : null;
+  } catch (_) { return null; }
+}
+
+function getCookie(request, name) {
+  for (const part of (request.headers.get('Cookie') || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+  }
+  return '';
+}
+const setCookie = (name, value, maxAge, path) => `${name}=${value}; Max-Age=${maxAge}; Path=${path}; HttpOnly; Secure; SameSite=Lax`;
+function redirect(location, cookies = []) {
+  const headers = new Headers({ ...SECURITY_HEADERS, 'Cache-Control': 'no-store', 'Location': location });
+  for (const c of cookies) headers.append('Set-Cookie', c);
+  return new Response(null, { status: 302, headers });
+}
+function messagePage(status, title, text) {
+  const body = `<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body><h1>${title}</h1><p>${text}</p><p><a href="/auth/login">用其他 Google 帳號登入</a></p></body></html>`;
+  return new Response(body, { status, headers: { ...SECURITY_HEADERS, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
 
 async function authenticate(request, env) {
-  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD || !csv(env.ALLOWED_EMAILS).length) throw new HttpError(503, '登入尚未設定');
-  const parts = (request.headers.get('Cf-Access-Jwt-Assertion') || '').split('.');
-  if (parts.length !== 3) throw new HttpError(401, '請先登入');
-  let email;
-  try {
-    const header = b64uToJson(parts[0]);
-    const payload = b64uToJson(parts[1]);
-    if (header.alg !== 'RS256') throw new Error('alg');
-    const jwk = (await loadJwks(env)).find(k => k.kid === header.kid);
-    if (!jwk) throw new Error('kid');
-    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-    const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64uToBytes(parts[2]), new TextEncoder().encode(parts[0] + '.' + parts[1]));
-    const now = Math.floor(Date.now() / 1000);
-    if (!ok || ![].concat(payload.aud || []).includes(env.ACCESS_AUD) || payload.iss !== 'https://' + env.ACCESS_TEAM_DOMAIN
-      || !(payload.exp > now) || (payload.nbf && payload.nbf > now + 60) || !payload.email) throw new Error('claims');
-    email = String(payload.email).toLowerCase();
-  } catch (e) {
-    if (e instanceof HttpError) throw e;
-    throw new HttpError(401, '登入無效或已過期');
-  }
+  if (!authConfigured(env)) throw new HttpError(503, '登入尚未設定');
+  const session = await readToken(env, getCookie(request, SESSION_COOKIE));
+  if (!session || !session.email) throw new HttpError(401, '請先登入');
+  const email = String(session.email).toLowerCase();
   if (!csv(env.ALLOWED_EMAILS).map(s => s.toLowerCase()).includes(email)) throw new HttpError(403, '這個帳號沒有使用權限');
   return email;
 }
 
+let googleKeys = { at: 0, keys: null };
+async function loadGoogleKeys() {
+  if (googleKeys.keys && Date.now() - googleKeys.at < 3600e3) return googleKeys.keys;
+  const res = await fetch(GOOGLE_CERTS_URL);
+  if (!res.ok) throw new HttpError(503, 'Google 登入服務暫時無法驗證');
+  googleKeys = { at: Date.now(), keys: (await res.json()).keys || [] };
+  return googleKeys.keys;
+}
+
+async function verifyGoogleIdToken(idToken, env, nonce) {
+  const parts = String(idToken || '').split('.');
+  if (parts.length !== 3) throw new Error('format');
+  const header = b64uToJson(parts[0]);
+  const payload = b64uToJson(parts[1]);
+  if (header.alg !== 'RS256') throw new Error('alg');
+  const jwk = (await loadGoogleKeys()).find(k => k.kid === header.kid);
+  if (!jwk) throw new Error('kid');
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64uToBytes(parts[2]), new TextEncoder().encode(parts[0] + '.' + parts[1]));
+  const now = nowSec();
+  if (!ok || !GOOGLE_ISSUERS.includes(payload.iss) || payload.aud !== env.GOOGLE_CLIENT_ID || !(payload.exp > now)
+    || payload.nonce !== nonce || payload.email_verified !== true || !payload.email) throw new Error('claims');
+  return String(payload.email).toLowerCase();
+}
+
+async function handleAuthLogin(request, env, url) {
+  if (!authConfigured(env)) throw new HttpError(503, '登入尚未設定');
+  throttle('login:' + (request.headers.get('CF-Connecting-IP') || 'unknown'), 20);
+  const state = randomB64u(16), nonce = randomB64u(16), verifier = randomB64u(32);
+  const challenge = bytesToB64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const oauth = await signToken(env, { state, nonce, verifier, exp: nowSec() + 600 });
+  const params = new URLSearchParams({
+    client_id: env.GOOGLE_CLIENT_ID, redirect_uri: url.origin + '/auth/callback', response_type: 'code',
+    scope: 'openid email', state, nonce, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account',
+  });
+  return redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params, [setCookie(OAUTH_COOKIE, oauth, 600, '/auth')]);
+}
+
+async function handleAuthCallback(request, env, url) {
+  if (!authConfigured(env)) throw new HttpError(503, '登入尚未設定');
+  throttle('login:' + (request.headers.get('CF-Connecting-IP') || 'unknown'), 20);
+  const clearOauth = setCookie(OAUTH_COOKIE, '', 0, '/auth');
+  const saved = await readToken(env, getCookie(request, OAUTH_COOKIE));
+  const code = url.searchParams.get('code') || '', state = url.searchParams.get('state') || '';
+  if (!saved || !code || !safeEqual(saved.state, state)) return messagePage(400, '登入失敗', '登入逾時或來源不正確，請重新登入。');
+  let email;
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: url.origin + '/auth/callback', grant_type: 'authorization_code', code_verifier: saved.verifier }),
+    });
+    if (!res.ok) throw new Error('token');
+    email = await verifyGoogleIdToken((await res.json()).id_token, env, saved.nonce);
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    return messagePage(400, '登入失敗', 'Google 驗證沒有通過，請重新登入。');
+  }
+  if (!csv(env.ALLOWED_EMAILS).map(s => s.toLowerCase()).includes(email)) {
+    const page = messagePage(403, '沒有使用權限', '這個 Google 帳號不在允許名單內。');
+    page.headers.append('Set-Cookie', clearOauth);
+    return page;
+  }
+  const session = await signToken(env, { email, exp: nowSec() + SESSION_TTL_SECONDS });
+  return redirect('/', [setCookie(SESSION_COOKIE, session, SESSION_TTL_SECONDS, '/'), clearOauth]);
+}
+
 const writeLog = new Map();
-function throttleWrites(key) {
+function throttle(key, limit) {
   const now = Date.now();
   const recent = (writeLog.get(key) || []).filter(t => now - t < 60e3);
-  if (recent.length >= WRITE_LIMIT_PER_MIN) throw new HttpError(429, '操作太頻繁，請稍後再試');
+  if (recent.length >= limit) throw new HttpError(429, '操作太頻繁，請稍後再試');
   recent.push(now);
   writeLog.set(key, recent);
 }
+const throttleWrites = key => throttle(key, WRITE_LIMIT_PER_MIN);
 
 // ── Notion ───────────────────────────────────────────────────
 
@@ -361,6 +458,8 @@ async function api(request, env, ctx, url) {
   const body = (method === 'GET' || method === 'HEAD') ? {} : await request.json().catch(() => { throw new HttpError(400, '資料格式錯誤'); });
   let m;
 
+  if (method === 'GET' && path === '/api/me') return json({ email });
+
   if (method === 'GET' && path === '/api/config') {
     return json({ applicants: csv(env.APPLICANTS), leaveTypes: LEAVE_TYPES, expenseCats: EXPENSE_CATS });
   }
@@ -516,9 +615,18 @@ export default {
         if (url.pathname === '/api/line/notify' && request.method === 'POST') return await handleLineNotify(request, env);
         return new Response('Not found', { status: 404, headers: SECURITY_HEADERS });
       }
+      if (url.pathname === '/auth/login' && request.method === 'GET') return await handleAuthLogin(request, env, url);
+      if (url.pathname === '/auth/callback' && request.method === 'GET') return await handleAuthCallback(request, env, url);
+      if (url.pathname === '/auth/logout' && request.method === 'POST') {
+        if (request.headers.get('Origin') !== url.origin) throw new HttpError(403, '來源不被允許');
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...SECURITY_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': setCookie(SESSION_COOKIE, '', 0, '/') } });
+      }
       if (url.pathname.startsWith('/api/')) return await api(request, env, ctx, url);
       if (request.method === 'GET') {
-        await authenticate(request, env);
+        try { await authenticate(request, env); } catch (e) {
+          if (e instanceof HttpError && e.status === 401) return redirect('/auth/login');
+          throw e;
+        }
         const asset = serveAsset(url.pathname);
         if (asset) return asset;
       }

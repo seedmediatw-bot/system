@@ -42,6 +42,7 @@
     if (body !== undefined) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
     return fetch(path, opts).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.status === 401) { location.href = '/auth/login'; throw new Error('請先登入'); }
         if (!res.ok) throw new Error(data.error || '操作失敗（' + res.status + '）');
         return data;
       });
@@ -55,6 +56,10 @@
 
   // ── 全域狀態 ────────────────────────────────────────────────
   var config = { applicants: [], leaveTypes: [], expenseCats: [] };
+  var me = null;
+  function logout() {
+    api('POST', '/auth/logout', {}).then(function () { location.href = '/'; }, function (e) { toast(e.message, true); });
+  }
   var PAGES = [
     { id: 'home', label: '首頁' },
     { id: 'expense', label: '報帳' },
@@ -72,6 +77,9 @@
       PAGES.forEach(function (p) {
         nav.appendChild(h('a', { href: '#' + p.id, 'data-page': p.id }, window.NavIcons.create(p.id), h('span', { text: p.label })));
       });
+    }
+    if (me && !nav.querySelector('.who')) {
+      nav.appendChild(h('div', { class: 'who' }, h('span', { text: me.email }), h('button', { class: 'btn ghost small', type: 'button', text: '登出', onclick: logout })));
     }
     nav.querySelectorAll('a').forEach(function (a) {
       if (a.getAttribute('data-page') === current) a.setAttribute('aria-current', 'page');
@@ -457,7 +465,7 @@
   }
 
   window.addEventListener('hashchange', render);
-  api('GET', '/api/config').then(function (c) { config = c; render(); }).catch(function (e) {
+  Promise.all([api('GET', '/api/config'), api('GET', '/api/me')]).then(function (r) { config = r[0]; me = r[1]; render(); }).catch(function (e) {
     main.textContent = '';
     main.appendChild(h('h1', { text: '無法載入' }));
     main.appendChild(h('p', { class: 'err', text: e.message }));

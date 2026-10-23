@@ -6,6 +6,7 @@ const { webcrypto } = require('node:crypto');
 
 const calls = [];
 const dbResults = {};
+let nextIdToken = null;
 const respond = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 (async () => {
@@ -22,7 +23,8 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   const fakeFetch = async (url, opts = {}) => {
     calls.push({ url: String(url), method: opts.method || 'GET', body: opts.body, notifyKey: (opts.headers || {})['X-Notify-Key'] });
     url = String(url);
-    if (url.endsWith('/cdn-cgi/access/certs')) return respond({ keys: [jwk] });
+    if (url === 'https://www.googleapis.com/oauth2/v3/certs') return respond({ keys: [jwk] });
+    if (url === 'https://oauth2.googleapis.com/token') return nextIdToken ? respond({ id_token: nextIdToken }) : respond({ error: 'invalid_grant' }, 400);
     if (url.startsWith('https://api.line.me/') || url.startsWith('https://line.test/')) return respond({});
     if (url.includes('api.notion.com/v1/databases/') && url.endsWith('/query')) return respond({ results: dbResults[url.split('/databases/')[1].split('/')[0]] || [] });
     if (url.includes('api.notion.com/v1/pages') && (opts.method === 'POST' || opts.method === 'PATCH')) return respond({ id: 'new' });
@@ -31,7 +33,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
     return respond({}, 404);
   };
 
-  const context = vm.createContext({ crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, Request, Response, URL, console, atob, btoa, fetch: fakeFetch, Date, JSON, Math, Promise });
+  const context = vm.createContext({ crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, Request, Response, Headers, URLSearchParams, URL, console, atob, btoa, fetch: fakeFetch, Date, JSON, Math, Promise });
   vm.runInContext(`globalThis.__fakeNow = null; const _D = Date; globalThis.Date = class extends _D {
     constructor(...a) { if (a.length === 0 && globalThis.__fakeNow !== null) super(globalThis.__fakeNow); else super(...a); }
     static now() { return globalThis.__fakeNow !== null ? globalThis.__fakeNow : _D.now(); }
@@ -40,34 +42,114 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   const worker = context.worker;
 
   const env = {
-    ACCESS_TEAM_DOMAIN: 'team.cloudflareaccess.com', ACCESS_AUD: 'aud-1', ALLOWED_EMAILS: 'sam@example.com,b@example.com,c@example.com', APPLICANTS: '甲,乙',
+    GOOGLE_CLIENT_ID: 'client-1', GOOGLE_CLIENT_SECRET: 'cs-test', SESSION_SECRET: 'test-session-secret-0123456789-abcdefghijklmnop', ALLOWED_EMAILS: 'sam@example.com,b@example.com,c@example.com', APPLICANTS: '甲,乙',
     HR_TOKEN: 't', CRM_TOKEN: 't2', DB_LEAVE: 'db-leave', DB_EXPENSE: 'db-exp', DB_CHECKIN: 'db-checkin', DB_CRM: 'db-crm',
     LINE_CHANNEL_TOKEN: 'lt', LINE_CHANNEL_SECRET: 'line-secret', LINE_GROUP_ID: 'Cgroup', NOTIFY_KEY: 'nk-123',
     LINE_NOTIFY_URL: 'https://line.test/api/line/notify',
   };
   const ctx = { waitUntil: p => { ctx.pending.push(p); }, pending: [] };
   const now = Math.floor(Date.now() / 1000);
-  const goodClaims = { aud: ['aud-1'], iss: 'https://team.cloudflareaccess.com', exp: now + 600, email: 'sam@example.com' };
-  let good = await sign(goodClaims);
   const origin = 'https://hr.test';
   const req = (path, { jwt, method = 'GET', body, origin: o } = {}) => new Request(origin + path, {
-    method, headers: { 'Content-Type': 'application/json', ...(jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {}), ...(o ? { Origin: o } : {}) },
+    method, headers: { 'Content-Type': 'application/json', ...(jwt ? { Cookie: jwt } : {}), ...(o ? { Origin: o } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const call = (path, opts) => worker.fetch(req(path, opts), env, ctx);
   const notionCalls = () => calls.filter(c => c.url.includes('api.notion.com')).length;
+  let ipCounter = 0;
+  const idClaims = (email, nonce, over = {}) => ({ iss: 'https://accounts.google.com', aud: 'client-1', exp: now + 600, email, email_verified: true, nonce, ...over });
+  const startLogin = async (ip) => {
+    const r = await worker.fetch(new Request(origin + '/auth/login', { headers: { 'CF-Connecting-IP': ip } }), env, ctx);
+    return { r, loc: new URL(r.headers.get('location')), oauth: (r.headers.get('set-cookie') || '').split(';')[0] };
+  };
+  // 走完整的 Google 登入流程（Google 端由假的取代）
+  const loginAs = async (email, { claims = {}, key = kp.privateKey, state, noOauth = false } = {}) => {
+    const ip = '10.0.0.' + (++ipCounter);
+    const { loc, oauth } = await startLogin(ip);
+    nextIdToken = await sign(idClaims(email, loc.searchParams.get('nonce'), claims), key);
+    const res = await worker.fetch(new Request(origin + '/auth/callback?code=abc&state=' + (state !== undefined ? state : loc.searchParams.get('state')), { headers: { Cookie: noOauth ? '' : oauth, 'CF-Connecting-IP': ip } }), env, ctx);
+    const cookie = (res.headers.getSetCookie().find(c => c.startsWith('seed_session=')) || '').split(';')[0];
+    return { res, cookie };
+  };
 
-  // 登入：沒憑證、壞簽章、過期、錯 AUD、非允許信箱都不能碰 Notion
+  // 登入：沒登入拿不到任何東西；導向 Google 的參數正確（PKCE、state、nonce）
   let before = notionCalls();
-  assert.equal((await call('/api/home')).status, 401, '沒有憑證須 401');
-  const other = await webcrypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
-  assert.equal((await call('/api/home', { jwt: await sign(goodClaims, other.privateKey) })).status, 401, '簽章不符須 401');
-  assert.equal((await call('/api/home', { jwt: await sign({ ...goodClaims, exp: now - 10 }) })).status, 401, '過期須 401');
-  assert.equal((await call('/api/home', { jwt: await sign({ ...goodClaims, aud: ['other'] }) })).status, 401, 'AUD 不符須 401');
-  assert.equal((await call('/api/home', { jwt: await sign({ ...goodClaims, iss: 'https://evil.example.com' }) })).status, 401, 'ISS 不符須 401');
-  assert.equal((await call('/api/home', { jwt: await sign({ ...goodClaims, email: 'stranger@example.com' }) })).status, 403, '非允許信箱須 403');
-  assert.equal(notionCalls(), before, '未通過登入不得呼叫 Notion');
-  assert.equal((await call('/')).status, 401, '沒登入拿不到網頁');
+  assert.equal((await call('/api/home')).status, 401, '沒登入須 401');
+  const toLogin = await call('/');
+  assert.equal(toLogin.status, 302, '沒登入看網頁要導向登入');
+  assert.equal(toLogin.headers.get('location'), '/auth/login');
+  const { r: loginRes, loc } = await startLogin('10.9.9.9');
+  assert.equal(loginRes.status, 302);
+  assert.equal(loc.origin + loc.pathname, 'https://accounts.google.com/o/oauth2/v2/auth');
+  assert.equal(loc.searchParams.get('client_id'), 'client-1');
+  assert.equal(loc.searchParams.get('redirect_uri'), 'https://hr.test/auth/callback');
+  assert.equal(loc.searchParams.get('scope'), 'openid email');
+  assert.equal(loc.searchParams.get('response_type'), 'code');
+  assert.equal(loc.searchParams.get('code_challenge_method'), 'S256');
+  for (const k of ['state', 'nonce', 'code_challenge']) assert.ok(loc.searchParams.get(k).length >= 20, k + ' 要夠長');
+  assert.match(loginRes.headers.get('set-cookie'), /HttpOnly; Secure; SameSite=Lax/);
+
+  // 正確登入
+  const okLogin = await loginAs('sam@example.com');
+  assert.equal(okLogin.res.status, 302, '正確登入要導回首頁');
+  assert.equal(okLogin.res.headers.get('location'), '/');
+  assert.ok(okLogin.cookie.length > 40, '要發工作階段 Cookie');
+  assert.ok(okLogin.res.headers.getSetCookie().some(c => /^seed_session=.*HttpOnly; Secure; SameSite=Lax/.test(c)), 'Cookie 要 HttpOnly、Secure、SameSite');
+  const tokenCall = calls.filter(c => c.url === 'https://oauth2.googleapis.com/token').pop();
+  assert.match(String(tokenCall.body), /code_verifier=/, '換 token 要帶 PKCE code_verifier');
+  let good = okLogin.cookie;
+  assert.equal((await (await call('/api/me', { jwt: good })).json()).email, 'sam@example.com');
+
+  // 各種失敗登入：不得發 Cookie，也不得碰 Notion
+  const bads = [
+    ['簽章不符', { key: (await webcrypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify'])).privateKey }],
+    ['過期', { claims: { exp: now - 10 } }],
+    ['aud 不符', { claims: { aud: 'other-client' } }],
+    ['iss 不符', { claims: { iss: 'https://evil.example.com' } }],
+    ['nonce 不符', { claims: { nonce: 'wrong' } }],
+    ['信箱未驗證', { claims: { email_verified: false } }],
+    ['state 不符', { state: 'wrong-state' }],
+    ['缺少 oauth cookie', { noOauth: true }],
+  ];
+  for (const [name, opts] of bads) {
+    const r = await loginAs('sam@example.com', opts);
+    assert.equal(r.res.status, 400, name + ' 須 400');
+    assert.equal(r.cookie, '', name + ' 不得發工作階段');
+  }
+  const stranger = await loginAs('stranger@example.com');
+  assert.equal(stranger.res.status, 403, '不在名單的信箱須 403');
+  assert.equal(stranger.cookie, '', '不在名單不得發工作階段');
+  assert.equal(notionCalls(), before, '登入失敗不得呼叫 Notion');
+
+  // 工作階段本身：竄改、過期、撤銷、換密鑰
+  assert.equal((await call('/api/home', { jwt: good.slice(0, -2) + 'xx' })).status, 401, '竄改簽章須 401');
+  assert.equal((await call('/api/home', { jwt: 'seed_session=garbage' })).status, 401, '亂碼須 401');
+  context.__fakeNow = (now + 9 * 3600) * 1000;
+  assert.equal((await call('/api/home', { jwt: good })).status, 401, '超過 8 小時須 401');
+  context.__fakeNow = null;
+  const savedEmails = env.ALLOWED_EMAILS;
+  env.ALLOWED_EMAILS = 'b@example.com';
+  assert.equal((await call('/api/home', { jwt: good })).status, 403, '從名單移除後須立刻失效');
+  env.ALLOWED_EMAILS = savedEmails;
+  const savedSecret = env.SESSION_SECRET;
+  env.SESSION_SECRET = 'another-secret-another-secret-another-secret';
+  assert.equal((await call('/api/home', { jwt: good })).status, 401, '換 SESSION_SECRET 後全部登出');
+  env.SESSION_SECRET = savedSecret;
+  delete env.SESSION_SECRET;
+  assert.equal((await call('/api/home', { jwt: good })).status, 503, '沒設定 SESSION_SECRET 須 503');
+  env.SESSION_SECRET = savedSecret;
+  assert.equal(notionCalls(), before, '失敗的請求不得呼叫 Notion');
+
+  // 登出：要有 Origin，並清掉 Cookie
+  assert.equal((await call('/auth/logout', { jwt: good, method: 'POST', body: {} })).status, 403, '登出缺 Origin 須 403');
+  const out = await call('/auth/logout', { jwt: good, method: 'POST', body: {}, origin });
+  assert.equal(out.status, 200);
+  assert.match(out.headers.get('set-cookie'), /Max-Age=0/);
+
+  // 登入入口節流
+  let tl;
+  for (let i = 0; i < 25; i++) tl = await worker.fetch(new Request(origin + '/auth/login', { headers: { 'CF-Connecting-IP': '10.8.8.8' } }), env, ctx);
+  assert.equal(tl.status, 429, '同一來源連續登入須被節流');
   console.log('PASS 登入驗證');
 
   // 網頁與安全標頭
@@ -138,7 +220,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   console.log('PASS 簽到');
 
 
-  good = await sign({ ...goodClaims, email: 'b@example.com' }); // 換一個帳號，避開寫入節流
+  good = (await loginAs('b@example.com')).cookie; // 換一個帳號，避開寫入節流
   // 全月正常出勤：週末、國定假日、請假日、已簽到日都不預設勾選
   dbResults['db-leave'] = [{ properties: { '開始日期': { date: { start: '2026-10-14' } }, '結束日期': { date: { start: '2026-10-15' } } } }];
   dbResults['db-checkin'] = [{ properties: { '日期': { date: { start: '2026-10-05' } } } }];
@@ -169,7 +251,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   dbResults['db-leave'] = []; dbResults['db-checkin'] = [];
   console.log('PASS 全月正常出勤');
 
-  good = await sign({ ...goodClaims, email: 'c@example.com' });
+  good = (await loginAs('c@example.com')).cookie;
   // 寫入節流
   let last;
   for (let i = 0; i < 25; i++) last = await call('/api/checkin/12345678123412341234123456789012', { jwt: good, method: 'PATCH', origin, body: { date: '2026-11-02', clockIn: '09:00' } });
