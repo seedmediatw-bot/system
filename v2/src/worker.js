@@ -265,6 +265,51 @@ const monthRange = month => {
   return { start: `${month}-01`, end: `${month}-${String(last).padStart(2, '0')}` };
 };
 
+
+// 國定假日（只列平日放假與補假；週末一律不排班）。資料來源：ruyut/TaiwanCalendar 2026.json，
+// 使用前請以行政院人事行政總處公告為準。2026 年沒有週末補班日；其他年份沒有資料時預覽會提醒。
+const HOLIDAYS = {
+  '2026-01-01': '開國紀念日', '2026-02-16': '農曆除夕', '2026-02-17': '春節', '2026-02-18': '春節', '2026-02-19': '春節',
+  '2026-02-20': '補假', '2026-02-27': '補假', '2026-04-03': '補假', '2026-04-06': '補假', '2026-05-01': '勞動節',
+  '2026-06-19': '端午節', '2026-09-25': '中秋節', '2026-09-28': '教師節', '2026-10-09': '補假', '2026-10-26': '補假',
+  '2026-12-25': '行憲紀念日',
+};
+const MAKEUP_WORKDAYS = {};
+const HOLIDAY_YEARS = ['2026'];
+const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+const validMonth = v => {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(v || '')) throw new HttpError(400, '月份不正確');
+  return v;
+};
+
+async function checkinPlan(env, name, month) {
+  const { start, end } = monthRange(month);
+  const [existing, leaves] = await Promise.all([
+    queryDb(env.HR_TOKEN, env.DB_CHECKIN, { filter: { and: [{ property: '姓名', title: { equals: name } }, { property: '日期', date: { on_or_after: start } }, { property: '日期', date: { on_or_before: end } }] }, page_size: 100 }),
+    queryDb(env.HR_TOKEN, env.DB_LEAVE, { filter: { and: [{ property: '姓名', rich_text: { equals: name } }, { property: '開始日期', date: { on_or_before: end } }, { property: '結束日期', date: { on_or_after: start } }] }, page_size: 100 }),
+  ]);
+  const done = new Set(existing.map(r => getDate(r.properties, '日期').slice(0, 10)));
+  const leaveDays = new Set();
+  for (const r of leaves) {
+    const a = getDate(r.properties, '開始日期').slice(0, 10), b = getDate(r.properties, '結束日期').slice(0, 10) || a;
+    for (let d = new Date(a + 'T00:00:00Z'); d <= new Date(b + 'T00:00:00Z'); d = new Date(d.getTime() + 86400e3)) leaveDays.add(d.toISOString().slice(0, 10));
+  }
+  const days = [];
+  const last = Number(end.slice(8));
+  for (let i = 1; i <= last; i++) {
+    const date = `${month}-${String(i).padStart(2, '0')}`;
+    const dow = new Date(date + 'T00:00:00Z').getUTCDay();
+    const weekend = (dow === 0 || dow === 6) && !MAKEUP_WORKDAYS[date];
+    if (weekend) continue;
+    let status = 'work', label = '';
+    if (HOLIDAYS[date]) { status = 'holiday'; label = HOLIDAYS[date]; }
+    else if (leaveDays.has(date)) { status = 'leave'; label = '請假'; }
+    else if (done.has(date)) { status = 'done'; label = '已有簽到'; }
+    days.push({ date, dow: WEEKDAY_NAMES[dow], status, label, checked: status === 'work' });
+  }
+  return { month, hasHolidayData: HOLIDAY_YEARS.includes(month.slice(0, 4)), days };
+}
+
 async function api(request, env, ctx, url) {
   const email = await authenticate(request, env);
   const method = request.method;
@@ -371,6 +416,30 @@ async function api(request, env, ctx, url) {
       '下班時間': { rich_text: rt(body.clockOut || '') }, '備註': { rich_text: rt(str(body.note, 300, false, '備註')) },
     } });
     return json({ ok: true });
+  }
+
+  if (method === 'GET' && path === '/api/checkin/plan') {
+    return json(await checkinPlan(env, applicant(url.searchParams.get('name'), env), validMonth(url.searchParams.get('month'))));
+  }
+  if (method === 'POST' && path === '/api/checkin/month') {
+    const name = applicant(body.name, env);
+    const month = validMonth(body.month);
+    if (!isTime(body.clockIn || '') || !isTime(body.clockOut || '') || !body.clockIn || !body.clockOut) throw new HttpError(400, '請填上班與下班時間');
+    const dates = Array.isArray(body.dates) ? [...new Set(body.dates)] : [];
+    if (!dates.length || dates.length > 31 || !dates.every(d => isDate(d) && d.startsWith(month + '-'))) throw new HttpError(400, '日期不正確');
+    const plan = await checkinPlan(env, name, month);
+    const already = new Set(plan.days.filter(d => d.status === 'done').map(d => d.date));
+    let created = 0;
+    const skipped = [];
+    for (const date of dates.sort()) {
+      if (already.has(date)) { skipped.push(date); continue; }
+      await notion(env.HR_TOKEN, 'POST', 'pages', { parent: { database_id: env.DB_CHECKIN }, properties: {
+        '姓名': { title: rt(name) }, '日期': { date: { start: date } }, '上班時間': { rich_text: rt(body.clockIn) },
+        '下班時間': { rich_text: rt(body.clockOut) }, '備註': { rich_text: rt('全月正常出勤') },
+      } });
+      created++;
+    }
+    return json({ ok: true, created, skipped });
   }
 
   if (path === '/api/clients' && method === 'GET') {

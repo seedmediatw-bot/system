@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 
 const calls = [];
-let notionPages = [];
+const dbResults = {};
 const respond = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 (async () => {
@@ -24,7 +24,7 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
     url = String(url);
     if (url.endsWith('/cdn-cgi/access/certs')) return respond({ keys: [jwk] });
     if (url.startsWith('https://api.line.me/')) return respond({});
-    if (url.includes('api.notion.com/v1/databases/') && url.endsWith('/query')) return respond({ results: [] });
+    if (url.includes('api.notion.com/v1/databases/') && url.endsWith('/query')) return respond({ results: dbResults[url.split('/databases/')[1].split('/')[0]] || [] });
     if (url.includes('api.notion.com/v1/pages') && (opts.method === 'POST' || opts.method === 'PATCH')) return respond({ id: 'new' });
     if (url.includes('api.notion.com/v1/pages/')) return respond({ id: 'p', parent: { database_id: 'db-checkin' } });
     if (url.includes('/children')) return respond({ results: [] });
@@ -116,6 +116,37 @@ const respond = (data, status = 200) => new Response(JSON.stringify(data), { sta
   assert.equal((await call('/api/checkin/not-a-uuid', { jwt: good, method: 'PATCH', origin, body: { date: '2026-11-02', clockIn: '09:00' } })).status, 404, '不是編號的路徑不處理');
   assert.equal((await call('/api/checkin/12345678123412341234123456789012', { jwt: good, method: 'PATCH', origin, body: { date: '2026-11-02', clockIn: '25:99' } })).status, 400);
   console.log('PASS 簽到');
+
+
+  // 全月正常出勤：週末、國定假日、請假日、已簽到日都不預設勾選
+  dbResults['db-leave'] = [{ properties: { '開始日期': { date: { start: '2026-10-14' } }, '結束日期': { date: { start: '2026-10-15' } } } }];
+  dbResults['db-checkin'] = [{ properties: { '日期': { date: { start: '2026-10-05' } } } }];
+  const plan = await (await call('/api/checkin/plan?name=' + encodeURIComponent('甲') + '&month=2026-10', { jwt: good })).json();
+  const byDate = Object.fromEntries(plan.days.map(d => [d.date, d]));
+  assert.equal(plan.hasHolidayData, true);
+  assert.equal(byDate['2026-10-03'], undefined, '週六不列入');
+  assert.equal(byDate['2026-10-09'].status, 'holiday', '10/9 補假');
+  assert.equal(byDate['2026-10-09'].checked, false);
+  assert.equal(byDate['2026-10-14'].status, 'leave');
+  assert.equal(byDate['2026-10-15'].checked, false);
+  assert.equal(byDate['2026-10-05'].status, 'done');
+  assert.equal(byDate['2026-10-06'].checked, true);
+  assert.equal(plan.days.filter(d => d.checked).length, 17, '10 月 22 個平日扣 2 天補假、2 天請假、1 天已簽到 = 17');
+  const plan2 = await (await call('/api/checkin/plan?name=' + encodeURIComponent('甲') + '&month=2027-01', { jwt: good })).json();
+  assert.equal(plan2.hasHolidayData, false, '沒有資料的年份要提醒');
+  const pagesBefore = calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).length;
+  const bulk = await call('/api/checkin/month', { jwt: good, method: 'POST', origin, body: { name: '甲', month: '2026-10', clockIn: '09:00', clockOut: '18:00', dates: ['2026-10-05', '2026-10-06', '2026-10-07'] } });
+  assert.equal(bulk.status, 200, await bulk.clone().text());
+  const bulkJson = await bulk.json();
+  assert.equal(bulkJson.created, 2, '已有簽到的日子要略過');
+  assert.deepEqual(bulkJson.skipped, ['2026-10-05']);
+  assert.equal(calls.filter(c => c.method === 'POST' && c.url.endsWith('/v1/pages')).length, pagesBefore + 2);
+  for (const bad of [{ dates: ['2026-11-02'] }, { dates: [] }, { clockIn: '' }, { name: '陌生人' }, { month: '2026-13' }]) {
+    const r = await call('/api/checkin/month', { jwt: good, method: 'POST', origin, body: { name: '甲', month: '2026-10', clockIn: '09:00', clockOut: '18:00', dates: ['2026-10-06'], ...bad } });
+    assert.equal(r.status, 400, '壞資料須 400：' + JSON.stringify(bad));
+  }
+  dbResults['db-leave'] = []; dbResults['db-checkin'] = [];
+  console.log('PASS 全月正常出勤');
 
   // 寫入節流
   let last;

@@ -53,18 +53,30 @@
   // 儲存上次選的申請人（瀏覽器可能禁用儲存，失敗就算了）
   function remember(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
 
-  // ── 圖示（線條，自繪，24px）──────────────────────────────────
+  // ── 圖示：7×7 點陣，亮點是符號，暗點是底格 ───────────────────
   var ICONS = {
-    home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
-    expense: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
-    leave: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M9 15h6"/>',
-    checkin: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
-    clients: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V5h6v3M3 13h18"/>'
+    home: ['...#...', '..###..', '.#####.', '.#####.', '.##.##.', '.##.##.', '.#####.'],
+    expense: ['.#####.', '.#...#.', '.#.#.#.', '.#...#.', '.#.#.#.', '.#...#.', '.#.#.#.'],
+    leave: ['.#...#.', '#######', '#.....#', '#.#.#.#', '#.....#', '#.#.#.#', '#######'],
+    checkin: ['.#####.', '#..#..#', '#..#..#', '#..##.#', '#.....#', '#.....#', '.#####.'],
+    clients: ['..###..', '..#.#..', '#######', '#.....#', '#.###.#', '#.....#', '#######']
   };
+  var SVGNS = 'http://www.w3.org/2000/svg';
   function icon(name) {
-    var wrap = document.createElement('span');
-    wrap.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[name] + '</svg>';
-    return wrap.firstChild;
+    var svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 28 28');
+    svg.setAttribute('aria-hidden', 'true');
+    ICONS[name].forEach(function (row, y) {
+      for (var x = 0; x < 7; x++) {
+        var c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('cx', x * 4 + 2);
+        c.setAttribute('cy', y * 4 + 2);
+        c.setAttribute('r', row[x] === '#' ? 1.5 : 0.9);
+        c.setAttribute('class', row[x] === '#' ? 'dot on' : 'dot');
+        svg.appendChild(c);
+      }
+    });
+    return svg;
   }
 
   // ── 全域狀態 ────────────────────────────────────────────────
@@ -149,7 +161,7 @@
       body.appendChild(h('h2', { text: '最近送出' }));
       body.appendChild(d.recent.length
         ? h('div', { class: 'list' }, d.recent.map(function (x) {
-          return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name + '　' + x.kind }), h('span', { class: 'muted', text: x.date }), h('span', { class: 'sub', text: x.text }));
+          return h('div', { class: 'item recent' }, h('span', { class: 'title', text: x.name + '　' + x.kind }), h('span', { class: 'muted', text: x.date }), h('span', { class: 'sub', text: x.text }), h('span', { class: 'end-mark ' + (x.kind === '報帳' ? 'expense' : 'leave'), 'aria-hidden': 'true' }));
         }))
         : h('p', { class: 'empty', text: '沒有資料。' }));
     }).catch(function (e) { body.textContent = ''; body.appendChild(h('p', { class: 'err', text: e.message })); });
@@ -294,6 +306,59 @@
     });
     return form;
   }
+
+  // 全月正常出勤：先預覽要建立哪些天（自動排除週末、國定假日、請假日、已簽到日），確認後一次建立
+  function monthAttendance(nameGetter) {
+    var month = h('input', { type: 'month', value: todayStr().slice(0, 7), required: true });
+    var cin = h('input', { type: 'time', value: remember('monthIn') || '09:00' });
+    var cout = h('input', { type: 'time', value: remember('monthOut') || '18:00' });
+    var out = h('div', {});
+    var previewBtn = h('button', { class: 'btn ghost', type: 'button', text: '預覽這個月' });
+    previewBtn.addEventListener('click', function () {
+      out.textContent = '';
+      out.appendChild(h('p', { class: 'muted', text: '載入中…' }));
+      api('GET', '/api/checkin/plan?name=' + encodeURIComponent(nameGetter()) + '&month=' + month.value).then(function (plan) {
+        out.textContent = '';
+        if (!plan.hasHolidayData) out.appendChild(h('p', { class: 'err', text: '這一年還沒有國定假日資料，請自己取消勾選放假的日子。' }));
+        var boxes = [];
+        var list = h('div', { class: 'list' });
+        plan.days.forEach(function (d) {
+          var cb = h('input', { type: 'checkbox', checked: d.checked, 'aria-label': d.date });
+          boxes.push({ cb: cb, date: d.date });
+          list.appendChild(h('label', { class: 'item day-row' }, cb, h('span', { class: 'title', text: d.date.slice(5) + '（' + d.dow + '）' }), h('span', { class: 'muted', text: d.label })));
+        });
+        var count = h('p', { class: 'muted' });
+        var go2 = h('button', { class: 'btn', type: 'button' });
+        function refresh() {
+          var n = boxes.filter(function (b) { return b.cb.checked; }).length;
+          count.textContent = '將建立 ' + n + ' 筆，上班 ' + cin.value + '，下班 ' + cout.value + '。';
+          go2.textContent = '建立 ' + n + ' 筆簽到';
+          go2.disabled = n === 0;
+        }
+        boxes.forEach(function (b) { b.cb.addEventListener('change', refresh); });
+        refresh();
+        go2.addEventListener('click', function () {
+          var dates = boxes.filter(function (b) { return b.cb.checked; }).map(function (b) { return b.date; });
+          remember('monthIn', cin.value); remember('monthOut', cout.value);
+          submitWith(go2, function () {
+            return api('POST', '/api/checkin/month', { name: nameGetter(), month: month.value, clockIn: cin.value, clockOut: cout.value, dates: dates }).then(function (r) {
+              toast('已建立 ' + r.created + ' 筆' + (r.skipped.length ? '，略過 ' + r.skipped.length + ' 筆已有簽到' : ''));
+              go('checkin');
+            });
+          });
+        });
+        out.appendChild(list); out.appendChild(count); out.appendChild(go2);
+      }).catch(function (e) { out.textContent = ''; out.appendChild(h('p', { class: 'err', text: e.message })); });
+    });
+    return h('div', {},
+      h('h2', { text: '全月正常出勤' }),
+      h('p', { class: 'muted', text: '一次補齊整個月。預覽會排除週末、國定假日、請假日與已有簽到的日子，你可以再手動勾選調整。' }),
+      h('div', { class: 'row2' },
+        h('div', { class: 'field' }, h('label', { text: '月份' }), month),
+        h('div', { class: 'row2' }, h('div', { class: 'field' }, h('label', { text: '上班' }), cin), h('div', { class: 'field' }, h('label', { text: '下班' }), cout))),
+      previewBtn, out);
+  }
+
   function pageCheckin() {
     main.appendChild(h('h1', { text: '簽到' }));
     main.appendChild(h('p', { class: 'muted', text: '送出後可以再修改，每筆會顯示最後修改時間，方便核對。' }));
@@ -303,6 +368,7 @@
       v.name = $('f-name').value;
       return api('POST', '/api/checkin', v).then(function () { toast('已記錄'); go('checkin'); });
     }, '記錄'));
+    main.appendChild(monthAttendance(function () { return $('f-name').value; }));
     main.appendChild(h('h2', { text: '最近的簽到' }));
     var box = h('div', {}, h('p', { class: 'muted', text: '載入中…' }));
     main.appendChild(box);
