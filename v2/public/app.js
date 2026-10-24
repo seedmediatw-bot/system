@@ -79,7 +79,7 @@
       });
     }
     if (me && !nav.querySelector('.who')) {
-      nav.appendChild(h('div', { class: 'who' }, h('span', { text: me.email }), h('button', { class: 'btn ghost small', type: 'button', text: '登出', onclick: logout })));
+      nav.appendChild(h('div', { class: 'who' }, h('span', { class: 'account-email' }, me.email.split('@')[0], h('wbr'), '@' + me.email.split('@').slice(1).join('@')), h('button', { class: 'btn ghost small', type: 'button', text: '登出', onclick: logout })));
     }
     nav.querySelectorAll('a').forEach(function (a) {
       if (a.getAttribute('data-page') === current) a.setAttribute('aria-current', 'page');
@@ -120,39 +120,44 @@
     main.appendChild(body);
     api('GET', url).then(function (d) {
       body.textContent = '';
-      var L = h('div', { class: 'col-main' }), R = h('div', { class: 'col-side' });
-      body.appendChild(h('div', { class: 'cols' }, L, R));
-      L.appendChild(h('h2', { text: '今天（' + d.today + '）請假' }));
-      L.appendChild(d.todayLeaves.length
+      var L = h('div', { class: 'home-column' });
+      var R = h('section', { class: 'home-panel home-recent', 'aria-labelledby': 'home-recent-title' },
+        h('h2', { class: 'home-panel-heading', id: 'home-recent-title', text: '最近送出' }));
+      body.appendChild(h('div', { class: 'home-grid' }, L, R));
+      var today = h('section', { class: 'home-panel home-today', 'aria-labelledby': 'home-today-title' },
+        h('h2', { class: 'home-panel-heading', id: 'home-today-title' }, h('span', { text: '今天請假' }), h('time', { class: 'home-date', datetime: d.today, text: d.today })));
+      today.appendChild(d.todayLeaves.length
         ? h('div', { class: 'list' }, d.todayLeaves.map(function (x) {
           return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: x.type + (x.days ? ' ' + fmtLeave(x.days) : '') }));
         }))
         : h('p', { class: 'empty', text: '今天沒有人請假。' }));
-
+      L.appendChild(today);
       var parts = d.month.split('-').map(Number);
       var prev = new Date(parts[0], parts[1] - 2, 1), next = new Date(parts[0], parts[1], 1);
       var ym = function (dt) { return dt.getFullYear() + '-' + pad(dt.getMonth() + 1); };
-      L.appendChild(h('div', { class: 'month-bar' },
-        h('h2', { text: parts[0] + ' 年 ' + parts[1] + ' 月' }),
-        h('div', {},
-          h('button', { class: 'btn ghost small', type: 'button', text: '上個月', onclick: function () { go('home', ym(prev)); } }), ' ',
+      var monthly = h('section', { class: 'home-panel home-month', 'aria-labelledby': 'home-month-title' });
+      monthly.appendChild(h('div', { class: 'home-panel-heading month-bar' },
+        h('h2', { id: 'home-month-title', text: parts[0] + ' 年 ' + parts[1] + ' 月' }),
+        h('div', { class: 'home-month-actions' },
+          h('button', { class: 'btn ghost small', type: 'button', text: '上個月', onclick: function () { go('home', ym(prev)); } }),
           h('button', { class: 'btn ghost small', type: 'button', text: '下個月', onclick: function () { go('home', ym(next)); } }))));
-
-      L.appendChild(h('h2', { text: '誰請了多少假' }));
-      L.appendChild(d.leaveByPerson.length
+      var leaves = h('section', { class: 'home-subsection', 'aria-labelledby': 'home-leave-title' },
+        h('h3', { id: 'home-leave-title', text: '誰請了多少假' }));
+      leaves.appendChild(d.leaveByPerson.length
         ? h('div', { class: 'list' }, d.leaveByPerson.map(function (x) {
           return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: fmtLeave(x.days) + '（' + x.count + ' 筆）' }));
         }))
         : h('p', { class: 'empty', text: '這個月沒有請假紀錄。' }));
-
-      L.appendChild(h('h2', { text: '誰報了多少帳' }));
-      L.appendChild(d.expenseByPerson.length
+      monthly.appendChild(leaves);
+      var expenses = h('section', { class: 'home-subsection', 'aria-labelledby': 'home-expense-title' },
+        h('h3', { id: 'home-expense-title', text: '誰報了多少帳' }));
+      expenses.appendChild(d.expenseByPerson.length
         ? h('div', { class: 'list' }, d.expenseByPerson.map(function (x) {
           return h('div', { class: 'item' }, h('span', { class: 'title', text: x.name }), h('span', { text: money(x.total) + '（' + x.count + ' 筆）' }));
         }))
         : h('p', { class: 'empty', text: '這個月沒有報帳紀錄。' }));
-
-      R.appendChild(h('h2', { text: '最近送出' }));
+      monthly.appendChild(expenses);
+      L.appendChild(monthly);
       R.appendChild(d.recent.length
         ? h('div', { class: 'list' }, d.recent.map(function (x) {
           return h('div', { class: 'item recent' }, h('span', { class: 'title', text: x.name + '　' + x.kind }), h('span', { class: 'muted', text: x.date }), h('span', { class: 'sub', text: x.text }), h('span', { class: 'end-mark ' + (x.kind === '報帳' ? 'expense' : 'leave'), 'aria-hidden': 'true' }));
@@ -413,37 +418,96 @@
   }
 
   // ── 客戶（只看）────────────────────────────────────────────
+  function splitTopic(t) {
+    var i = t.search(/[：:]/);
+    return i > 0 && i <= 8 ? { k: t.slice(0, i).trim(), v: t.slice(i + 1).trim() } : { k: '', v: t.trim() };
+  }
+  function planLines(action) {
+    return String(action || '').replace(/<br\s*\/?>/gi, '\n').split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
+  }
+  function parsePlan(action) {
+    var lines = planLines(action);
+    if (!lines.some(function(l){ return /^[•・]?\s*(現況|下一步)[：:]/.test(l); })) return null;
+    var plan = { date: '', now: '', next: [], pending: [], others: [], loose: [] }, cur = null;
+    lines.forEach(function(l){
+      var m = l.match(/^最新近況\s*[｜|]\s*(.+)$/);
+      if (m) { plan.date = m[1]; return; }
+      if (/^-\s*/.test(l)) {
+        var item = splitTopic(l.replace(/^-\s*/, ''));
+        if (cur === 'next' || cur === 'pending') plan[cur].push(item); else plan.loose.push(item.k ? item.k + '：' + item.v : item.v);
+        return;
+      }
+      var bullet = /^[•・]/.test(l), b = l.replace(/^[•・]\s*/, ''), j = b.search(/[：:]/);
+      var label = j > 0 && j <= 20 ? b.slice(0, j).trim() : '', text = label ? b.slice(j + 1).trim() : b;
+      if (label === '現況') { plan.now = text; cur = 'now'; }
+      else if (label === '下一步' || label === '待確認事項') {
+        cur = label === '下一步' ? 'next' : 'pending';
+        if (text) plan[cur].push(splitTopic(text));
+      }
+      else if (bullet && label) { plan.others.push({ k: label, v: text }); cur = null; }
+      else { plan.loose.push(l.replace(/^[•・]\s*/, '')); cur = null; }
+    });
+    return plan;
+  }
+
+  function clientField(label, content, cls) {
+    return h('div', { class: 'client-field' + (cls ? ' ' + cls : '') },
+      h('h3', { class: 'client-label', text: label }), content);
+  }
+  function clientItems(items) {
+    if (!items.length) return h('p', { class: 'client-empty', text: '尚未填寫' });
+    return h('ul', { class: 'client-facts' }, items.map(function (it) {
+      return h('li', { class: it.k ? '' : 'no-topic' },
+        it.k ? h('strong', { class: 'client-topic', text: it.k }) : null,
+        h('span', { text: it.v }));
+    }));
+  }
   function pageClients() {
     main.appendChild(h('h1', { text: '客戶' }));
-    main.appendChild(h('p', { class: 'muted', text: '只能查看。有新動態的客戶排在最上面；新增與修改請到 Notion。' }));
+    main.appendChild(h('p', { class: 'muted', text: '有新動態的客戶排在最上面；點開查看歷史紀錄。新增與修改請到 Notion。' }));
     var box = h('div', { class: 'client-list' }, h('p', { class: 'muted', text: '載入中…' }));
     main.appendChild(box);
     api('GET', '/api/clients').then(function (d) {
       box.textContent = '';
       if (!d.items.length) { box.appendChild(h('p', { class: 'empty', text: '沒有客戶資料。' })); return; }
-      var list = h('div', { class: 'list' });
       d.items.forEach(function (c) {
-        var logBox = h('div', {});
+        var plan = parsePlan(c.action);
+        var overview = h('div', { class: 'client-overview' });
+        overview.appendChild(clientField('現況',
+          h('div', { class: 'client-now', text: plan ? (plan.now || '尚未填寫') : (planLines(c.action).join('\n') || '尚未填寫') }), 'client-current'));
+        if (plan) {
+          overview.appendChild(clientField('下一步', clientItems(plan.next)));
+          overview.appendChild(clientField('待確認事項', clientItems(plan.pending)));
+          var others = plan.others.concat(plan.loose.map(function (v) { return { k: '', v: v }; }));
+          if (others.length) overview.appendChild(clientField('其他持續事項', clientItems(others), 'client-other'));
+        }
+        var logBox = h('div', { 'aria-live': 'polite' });
         var loaded = false;
-        var det = h('details', { class: 'client' },
-          h('summary', {},
-            h('span', { class: 'title', text: c.name || '（未命名）' }),
-            h('span', { class: 'muted', text: [c.status, c.priority].filter(Boolean).join('　') + '　更新 ' + c.updated })),
+        var det = h('details', { class: 'client client-card', 'data-client-id': c.id },
+          h('summary', { class: 'client-summary', 'aria-label': (c.name || '未命名客戶') + '，近況與歷史紀錄' },
+            h('div', { class: 'client-meta' },
+              h('h2', { class: 'client-name', text: c.name || '（未命名）' }),
+              h('div', { class: 'client-status', text: [c.status, c.priority].filter(Boolean).join('、') }),
+              h('div', { class: 'client-updated', text: '資料更新 ' + (c.updated || '未填寫') }),
+              h('span', { class: 'client-history-toggle' },
+                h('span', { class: 'client-open-label', text: '查看歷史紀錄' }),
+                h('span', { class: 'client-close-label', text: '收合歷史紀錄' }),
+                h('span', { class: 'client-chevron', 'aria-hidden': 'true' }))),
+            overview),
           h('div', { class: 'client-body' },
-            c.action ? h('p', {}, h('strong', { text: '下一步：' }), c.action) : null,
             c.commitment ? h('p', {}, h('strong', { text: '承諾事項：' }), c.commitment) : null,
             c.notes ? h('p', {}, h('strong', { text: '現況備註：' }), c.notes) : null,
             c.amount ? h('p', {}, h('strong', { text: '專案金額：' }), money(c.amount)) : null,
-            logBox));
+            h('h3', { class: 'client-log-title', text: '歷史紀錄' }), logBox));
         det.addEventListener('toggle', function () {
           if (!det.open || loaded) return;
           loaded = true;
-          logBox.appendChild(h('p', { class: 'muted', text: '載入歷史日誌…' }));
+          logBox.appendChild(h('p', { class: 'client-empty', text: '載入歷史紀錄…' }));
           api('GET', '/api/clients/' + c.id + '/log').then(function (r) {
             logBox.textContent = '';
-            if (!r.days.length) { logBox.appendChild(h('p', { class: 'empty', text: '這位客戶沒有歷史日誌。' })); return; }
+            if (!r.days.length) { logBox.appendChild(h('p', { class: 'client-empty', text: '這位客戶沒有歷史紀錄。' })); return; }
             r.days.forEach(function (day) {
-              logBox.appendChild(h('h3', { text: day.date }));
+              logBox.appendChild(h('h4', { class: 'client-log-date', text: day.date }));
               day.entries.forEach(function (en) {
                 var p = h('div', { class: 'log-entry' }, h('span', { text: en.text }));
                 en.links.forEach(function (l) { p.appendChild(document.createTextNode(' ')); p.appendChild(h('a', { href: l.href, target: '_blank', rel: 'noopener noreferrer', text: l.text })); });
@@ -452,9 +516,8 @@
             });
           }).catch(function (e) { loaded = false; logBox.textContent = ''; logBox.appendChild(h('p', { class: 'err', text: e.message })); });
         });
-        list.appendChild(h('div', { class: 'item single' }, det));
+        box.appendChild(det);
       });
-      box.appendChild(list);
     }).catch(function (e) { box.textContent = ''; box.appendChild(h('p', { class: 'err', text: e.message })); });
   }
 
@@ -471,6 +534,7 @@
     current = { id: id, arg: parts[1] || '' };
     renderNav(id);
     main.textContent = '';
+    main.classList.toggle('main-clients', id === 'clients');
     ({ home: function () { pageHome(current.arg); }, expense: pageExpense, leave: pageLeave, checkin: pageCheckin, clients: pageClients })[id]();
     window.scrollTo(0, 0);
   }
